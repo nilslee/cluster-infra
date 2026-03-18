@@ -22,10 +22,10 @@ This will pull the code base for all applications that will be in the cluster by
 ./bootstrap.sh
 ```
 
-### 3. Run deploy_minikube.sh
+### 3. Run Skaffold
 
-This will the cluster based on the manifests stored in `k8s` directory
+This will the cluster based on the manifests stored in `k8s` directory using `skaffold.yaml`
 
 ```
-./deploy_minikube.sh
+skaffold run
 ```

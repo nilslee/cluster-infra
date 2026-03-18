@@ -1,0 +1,19 @@
+apiVersion: skaffold/v4beta11
+kind: Config
+metadata:
+  name: my-redis-project
+build:
+  local:
+    push: false # Crucial for Minikube; avoids Docker Hub
+  artifacts:
+    - image: my-redis
+      context: ../my-redis
+    - image: redis-gui-tester
+      context: ../redis-gui-tester
+manifests:
+  rawYaml:
+    - k8s/namespaces/*.yaml
+    - k8s/my-redis/*.yaml
+    - k8s/redis-gui-tester/*.yaml
+deploy:
+  kubectl: {}

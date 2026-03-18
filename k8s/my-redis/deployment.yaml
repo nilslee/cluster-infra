@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: my-redis
-          image: my-redis
-          imagePullPolicy: Never # important for local minikube images
+          image: my-redis:latest
+          imagePullPolicy: Never # Uses your local Minikube build
           ports:
             - containerPort: 6379

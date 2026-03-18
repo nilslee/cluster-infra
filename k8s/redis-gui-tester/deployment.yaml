@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-gui-tester
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-gui-tester
+  template:
+    metadata:
+      labels:
+        app: redis-gui-tester
+    spec:
+      containers:
+        # Container 1: GUI Tester Container
+        - name: redis-gui-tester-app
+          image: redis-gui-tester:latest
+          imagePullPolicy: Never # Uses your local Minikube build
+          ports:
+            - containerPort: 3000
+          env:
+            - name: REAL_REDIS_ADDR
+              value: "localhost:6379"
+            - name: MY_REDIS_ADDR
+              value: "my-redis:6379"
+          volumeMounts:
+            - mountPath: "/app/data" # Path inside the container
+              name: data-storage-volume
+
+        # Container 2: Real Redis (Expected Response Source)
+        - name: real-redis
+          image: redis:alpine
+          ports:
+            - containerPort: 6379
+
+      volumes:
+        - name: data-storage-volume
+          persistentVolumeClaim:
+            claimName: redis-gui-tester
