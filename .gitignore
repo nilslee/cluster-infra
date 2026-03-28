@@ -1,0 +1,19 @@
+# Vagrant
+.vagrant/
+
+# Kubernetes config (contains credentials)
+kubeconfig
+
+# Authentication tokens
+token
+
+# OS files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
