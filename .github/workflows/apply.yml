@@ -2,7 +2,7 @@ name: Apply Infrastructure
 on:
   push:
     branches: [main]
-    paths: ['cluster-infra/k8s/**']
+    paths: ['k8s/**']
   workflow_dispatch:
 
 jobs:
@@ -14,4 +14,4 @@ jobs:
       - name: Apply manifests
         run: |
           export KUBECONFIG=/vagrant/kubeconfig
-          kubectl apply -R -f cluster-infra/k8s/ -n k8s-lab
+          kubectl apply -R -f k8s/ -n k8s-lab
