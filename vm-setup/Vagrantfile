@@ -48,6 +48,8 @@ Vagrant.configure("2") do |config|
     ci.vm.hostname = "runner-ci"
 
     # Define the sync folder specifically for this VM
+    ci.vm.synced_folder "../networking", "/networking", type: "rsync",
+      rsync__exclude: [".git/"]
     ci.vm.synced_folder "../monitoring", "/monitoring", type: "rsync",
       rsync__exclude: [".git/"]
     ci.vm.synced_folder "../dashboard", "/dashboard", type: "rsync",
@@ -59,6 +61,7 @@ Vagrant.configure("2") do |config|
       vb.cpus = 2
     end
     ci.vm.provision "shell", path: "runner-ci.sh"
+    ci.vm.provision "shell", path: "setup-networking.sh"
     ci.vm.provision "shell", path: "setup-monitoring.sh"
     ci.vm.provision "shell", path: "setup-dashboard.sh"
   end

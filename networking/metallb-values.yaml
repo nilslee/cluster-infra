@@ -1,0 +1,20 @@
+# Helm values for MetalLB -- tuned for the k8s-lab VMs.
+# Deployed into the `metallb-system` namespace by setup-networking.sh.
+# IP pool and L2 advertisement are applied separately via metallb-pool.yaml
+# after the CRDs are available.
+controller:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+speaker:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi

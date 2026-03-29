@@ -12,4 +12,6 @@ helm upgrade --install headlamp headlamp/headlamp \
   -n dashboard \
   -f /dashboard/headlamp-values.yaml
 
-echo "Headlamp deployed. Dashboard: http://<any-node-ip>:30090 (e.g. 192.168.56.12:30090)"
+kubectl apply -f /dashboard/headlamp-ingress.yaml
+
+echo "Headlamp deployed. Dashboard: http://headlamp.k8s.lab (via NGINX Ingress)"

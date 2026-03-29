@@ -1,8 +1,6 @@
 service:
-  type: NodePort
+  type: ClusterIP
   port: 80
-  nodePort: 30090
-  externalTrafficPolicy: Cluster
 
 clusterRoleBinding:
   create: true

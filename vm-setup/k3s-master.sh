@@ -23,7 +23,9 @@ curl -sfL https://get.k3s.io | sh -s - \
   --tls-san 192.168.56.11 \
   --advertise-address 192.168.56.11 \
   --node-ip 192.168.56.11 \
-  --flannel-iface "$FLANNEL_IFACE"
+  --flannel-iface "$FLANNEL_IFACE" \
+  --disable servicelb \
+  --disable traefik
 
 # Make sure kubectl is set up for the vagrant user
 sudo mkdir -p /home/vagrant/.kube

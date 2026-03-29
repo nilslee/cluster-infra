@@ -20,8 +20,9 @@ This directory contains the Vagrantfile and provisioning scripts for a local Kub
 - **kubectl** — talks to the k3s API server via `/vagrant/kubeconfig` (written by the master provisioning script)
 - **Helm** — used to deploy the monitoring stack and available for interactive use
 - **GitHub Actions Runner** — self-hosted runner agent registered to this repo with the label `k8s-lab`
-- **Monitoring stack** — deployed via `setup-monitoring.sh` (second provisioner) after the k3s cluster is ready
-- **Headlamp dashboard** — deployed via `setup-dashboard.sh` (third provisioner) after the monitoring stack
+- **Networking stack** — MetalLB (L2) + NGINX Ingress Controller deployed via `setup-networking.sh` (second provisioner)
+- **Monitoring stack** — deployed via `setup-monitoring.sh` (third provisioner) after networking is ready
+- **Headlamp dashboard** — deployed via `setup-dashboard.sh` (fourth provisioner) after the monitoring stack
 
 ### k3s-master (192.168.56.11)
 - Installs k3s server
@@ -163,7 +164,7 @@ The cluster ships with a full observability stack deployed automatically during 
 | **Promtail** | `promtail` | Log shipping from all nodes (DaemonSet) |
 All components run in the `monitoring` namespace.
 ### Accessing Grafana
-Open Grafana in your browser at **<http://192.168.56.12:30080>** (NodePort 30080 on any worker node IP, e.g. `.12` or `.13`).
+Open Grafana in your browser at **<http://grafana.k8s.lab>** (routed through NGINX Ingress via MetalLB VIP).
 Default credentials: **admin / admin**
 Both Prometheus and Loki are pre-configured as datasources.
 
@@ -202,7 +203,7 @@ The cluster includes [Headlamp](https://headlamp.dev/), a modern Kubernetes web 
 
 ### Accessing Headlamp
 
-Headlamp is exposed as NodePort 30090 on every cluster node. Open any of these in your browser:
+Open Headlamp in your browser at **<http://headlamp.k8s.lab>** (routed through NGINX Ingress via MetalLB VIP).
 
 - **<http://192.168.56.12:30090>** (k3s-worker1)
 - **<http://192.168.56.13:30090>** (k3s-worker2)
@@ -233,9 +234,36 @@ The script is idempotent (`helm upgrade --install`), so it is safe to run multip
 
 ---
 
-## Networking Notes
+## Networking
+### Architecture
+All HTTP traffic flows through a single MetalLB virtual IP into the NGINX Ingress Controller, which routes requests by hostname:
+```
+macOS Host ──▶ MetalLB VIP (192.168.56.200) ──▶ NGINX Ingress Controller
+                                                    ├─ grafana.k8s.lab   → Grafana   (monitoring)
+                                                    ├─ headlamp.k8s.lab  → Headlamp  (dashboard)
+                                                    └─ app.k8s.lab       → App Services
+```
+| Component | Namespace | Purpose |
+|-----------|-----------|---------|
+| **MetalLB** | `metallb-system` | Assigns VIPs from `192.168.56.200-220` via L2/ARP |
+| **NGINX Ingress Controller** | `ingress-nginx` | Routes HTTP traffic by hostname to backend services |
+### DNS Setup (macOS Host)
+Add the following to `/etc/hosts` on your macOS host so that browsers can resolve the `.k8s.lab` hostnames to the MetalLB VIP:
+```bash
+sudo sh -c 'echo "192.168.56.200 grafana.k8s.lab headlamp.k8s.lab app.k8s.lab" >> /etc/hosts'
+```
+Or manually add this line to `/etc/hosts`:
+```
+192.168.56.200 grafana.k8s.lab headlamp.k8s.lab app.k8s.lab
+```
+`192.168.56.200` is the first address MetalLB assigns from its pool to the NGINX Ingress Controller's LoadBalancer Service.
+### Network Notes
+
+### Network Notes
 
 - All VMs share a VirtualBox host-only network (`192.168.56.0/24`)
 - The container registry is **insecure** (plain HTTP); `registries.yaml` on each k3s node tells containerd to allow it
 - The runner accesses the k3s API at `https://192.168.56.11:6443` using `/vagrant/kubeconfig`
 - Workflows reference the registry as `192.168.56.10:5000/<image-name>`
+- MetalLB VIP pool (`192.168.56.200-220`) sits outside the static VM range (`.10-.13`) to avoid collisions
+- k3s's bundled ServiceLB and Traefik are disabled (`--disable servicelb --disable traefik`) in favour of MetalLB + NGINX

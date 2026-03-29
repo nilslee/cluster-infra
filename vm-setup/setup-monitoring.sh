@@ -48,4 +48,6 @@ for name in "${DASHBOARDS[@]}"; do
     -n monitoring grafana_dashboard=1 --overwrite
 done
 
-echo "Monitoring stack deployed. Grafana: http://192.168.56.12:30080"
+kubectl apply -f /monitoring/grafana-ingress.yaml
+
+echo "Monitoring stack deployed. Grafana: http://grafana.k8s.lab (via NGINX Ingress)"
