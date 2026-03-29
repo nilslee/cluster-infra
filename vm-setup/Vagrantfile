@@ -10,23 +10,12 @@ Vagrant.configure("2") do |config|
   # boxes at https://vagrantcloud.com/search.
   config.vm.box = "bento/ubuntu-22.04"  # for x86, use ubuntu/focal64
 
-  # Define the Runner CI VM
-  config.vm.define "runner-ci" do |ci|
-    ci.vm.hostname = "runner-ci"
-    ci.vm.network "private_network", ip: "192.168.56.10"
-    ci.vm.provider "virtualbox" do |vb|
-      vb.memory = "2048"
-      vb.cpus = 2
-    end
-    ci.vm.provision "shell", path: "runner-ci.sh"
-  end
-
   # Define the master node
   config.vm.define "k3s-master" do |master|
     master.vm.hostname = "k3s-master"
     master.vm.network "private_network", ip: "192.168.56.11"
     master.vm.provider "virtualbox" do |vb|
-      vb.memory = "2048"
+      vb.memory = "3072"
       vb.cpus = 2
     end
     master.vm.provision "shell", path: "k3s-master.sh"
@@ -37,7 +26,7 @@ Vagrant.configure("2") do |config|
     worker1.vm.hostname = "k3s-worker1"
     worker1.vm.network "private_network", ip: "192.168.56.12"
     worker1.vm.provider "virtualbox" do |vb|
-      vb.memory = "1024"
+      vb.memory = "2048"
       vb.cpus = 1
     end
     worker1.vm.provision "shell", path: "k3s-worker.sh", args: ["192.168.56.11"]
@@ -48,10 +37,30 @@ Vagrant.configure("2") do |config|
     worker2.vm.hostname = "k3s-worker2"
     worker2.vm.network "private_network", ip: "192.168.56.13"
     worker2.vm.provider "virtualbox" do |vb|
-      vb.memory = "1024"
+      vb.memory = "2048"
       vb.cpus = 1
     end
     worker2.vm.provision "shell", path: "k3s-worker.sh", args: ["192.168.56.11"]
+  end
+
+  # Define the Runner CI VM
+  config.vm.define "runner-ci" do |ci|
+    ci.vm.hostname = "runner-ci"
+
+    # Define the sync folder specifically for this VM
+    ci.vm.synced_folder "../monitoring", "/monitoring", type: "rsync",
+      rsync__exclude: [".git/"]
+    ci.vm.synced_folder "../dashboard", "/dashboard", type: "rsync",
+      rsync__exclude: [".git/"]
+
+    ci.vm.network "private_network", ip: "192.168.56.10"
+    ci.vm.provider "virtualbox" do |vb|
+      vb.memory = "2048"
+      vb.cpus = 2
+    end
+    ci.vm.provision "shell", path: "runner-ci.sh"
+    ci.vm.provision "shell", path: "setup-monitoring.sh"
+    ci.vm.provision "shell", path: "setup-dashboard.sh"
   end
 
   # Disable automatic box update checking. If you disable this, then

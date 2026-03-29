@@ -1,0 +1,15 @@
+# Helm values for grafana/promtail chart -- tuned for the k8s-lab VMs.
+# Ships logs from all nodes to the Loki instance in the monitoring namespace.
+# Deployed as a DaemonSet by setup-monitoring.sh.
+
+config:
+  clients:
+    - url: http://loki:3100/loki/api/v1/push
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi

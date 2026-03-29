@@ -53,5 +53,8 @@ chown -R vagrant:vagrant /home/vagrant/actions-runner
 #   sudo ./svc.sh install vagrant
 #   sudo ./svc.sh start
 
+# ── Helm ────────────────────────────────────────────────────────────────────
+curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
 echo "runner-ci provisioning complete."
 echo "Next step: register the GitHub Actions runner (see comments in this script or VM_README.md)."

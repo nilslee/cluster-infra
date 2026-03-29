@@ -10,8 +10,20 @@ mirrors:
       - "http://192.168.56.10:5000"
 EOF
 
-# Install K3s on the master node with readable kubeconfig
-curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644 --tls-san 192.168.56.11
+# Resolve the network interface that owns the host-only IP so flannel builds
+# its VXLAN tunnel on the right NIC. --node-ip alone is not enough on
+# multi-NIC VirtualBox VMs; --flannel-iface is required.
+FLANNEL_IFACE=$(ip -o addr show | grep 192.168.56.11 | awk '{print $2}')
+
+# Install K3s on the master node with readable kubeconfig.
+# --advertise-address and --node-ip force k3s to bind to the private network
+# interface instead of VirtualBox's NAT interface (eth0).
+curl -sfL https://get.k3s.io | sh -s - \
+  --write-kubeconfig-mode 644 \
+  --tls-san 192.168.56.11 \
+  --advertise-address 192.168.56.11 \
+  --node-ip 192.168.56.11 \
+  --flannel-iface "$FLANNEL_IFACE"
 
 # Make sure kubectl is set up for the vagrant user
 sudo mkdir -p /home/vagrant/.kube

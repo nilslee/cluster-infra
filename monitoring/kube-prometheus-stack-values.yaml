@@ -1,0 +1,84 @@
+# Helm values for kube-prometheus-stack -- tuned for the k8s-lab VMs.
+# Deployed into the `monitoring` namespace by setup-monitoring.sh.
+# ── Alertmanager ─────────────────────────────────────────────────────────────
+alertmanager:
+  enabled: false
+# ── Prometheus ───────────────────────────────────────────────────────────────
+prometheus:
+  prometheusSpec:
+    retention: 3d
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 400Mi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+# ── Grafana ───────────────────────────────────────────────────────────────────
+grafana:
+  adminPassword: admin
+  service:
+    type: NodePort
+    nodePort: 30080
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  # Pre-provision Loki as a datasource alongside the built-in Prometheus source.
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki:3100
+      access: proxy
+      isDefault: false
+  # ── Cluster-overview dashboards ──────────────────────────────────────────────
+  # Dashboards from dotdc/grafana-dashboards-kubernetes are downloaded by
+  # setup-monitoring.sh on the runner-ci VM (which has internet) and loaded as
+  # ConfigMaps labelled grafana_dashboard=1. The grafana-sc-dashboard sidecar
+  # picks them up automatically. This avoids the download-dashboards init
+  # container, which fails because pods cannot route to the public internet
+  # on the host-only VirtualBox network.
+# ── node-exporter ─────────────────────────────────────────────────────────────
+nodeExporter:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+# ── kube-state-metrics ────────────────────────────────────────────────────────
+kubeStateMetrics:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+# ── prometheus-operator ───────────────────────────────────────────────────────
+prometheusOperator:
+  # Admission webhooks require a cert-gen pre-install job that reliably times
+  # out on resource-constrained VMs. Disabling them avoids the pre-install hook
+  # entirely and is safe for a local lab cluster.
+  admissionWebhooks:
+    enabled: false
+  tls:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

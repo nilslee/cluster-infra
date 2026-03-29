@@ -1,0 +1,61 @@
+# Helm values for grafana/loki chart -- tuned for the k8s-lab VMs.
+# Deploys Loki in SingleBinary (monolithic) mode.
+# Promtail is deployed separately via the grafana/promtail chart.
+# Deployed into the `monitoring` namespace by setup-monitoring.sh.
+
+deploymentMode: SingleBinary
+
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  compactor:
+    retention_enabled: true
+    delete_request_store: filesystem
+  limits_config:
+    volume_enabled: true
+    retention_period: 72h     # 3 days
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 5Gi
+
+# Disable microservice-mode components (not used in SingleBinary mode).
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+
+# Disable components not needed for a single-node lab cluster.
+gateway:
+  enabled: false
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+lokiCanary:
+  enabled: false
+test:
+  enabled: false

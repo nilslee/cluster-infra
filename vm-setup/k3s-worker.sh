@@ -14,5 +14,14 @@ mirrors:
       - "http://192.168.56.10:5000"
 EOF
 
+# Detect this node's IP and interface on the private network by finding the
+# source address / device used to reach the master. This avoids accidentally
+# binding to VirtualBox's NAT interface (10.0.2.15) instead of the host-only
+# interface (192.168.56.x).
+NODE_IP=$(ip route get $MASTER_IP | grep -oP 'src \K[\d.]+')
+FLANNEL_IFACE=$(ip route get $MASTER_IP | grep -oP 'dev \K\S+')
+
 # Install K3s agent (worker) and join the master node
-curl -sfL https://get.k3s.io | K3S_URL=https://$MASTER_IP:6443 K3S_TOKEN=$TOKEN sh -
+curl -sfL https://get.k3s.io | K3S_URL=https://$MASTER_IP:6443 K3S_TOKEN=$TOKEN sh -s - \
+  --node-ip $NODE_IP \
+  --flannel-iface "$FLANNEL_IFACE"

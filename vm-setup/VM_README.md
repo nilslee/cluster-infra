@@ -4,13 +4,13 @@ This directory contains the Vagrantfile and provisioning scripts for a local Kub
 
 ## VM Layout
 
-| VM           | Hostname     | IP              | RAM    | CPUs | Role                                    |
-|--------------|--------------|-----------------|--------|------|-----------------------------------------|
-| `runner-ci`  | runner-ci    | 192.168.56.10   | 2048 MB | 2   | GitHub Actions runner + container registry |
-| `k3s-master` | k3s-master   | 192.168.56.11   | 2048 MB | 2   | k3s control plane                       |
-| `k3s-worker1`| k3s-worker1  | 192.168.56.12   | 1024 MB | 1   | k3s worker node                         |
-| `k3s-worker2`| k3s-worker2  | 192.168.56.13   | 1024 MB | 1   | k3s worker node                         |
-| **Total**    |              |                 | **6144 MB** | **6** |                                    |
+| VM           | Hostname     | IP              | RAM     | CPUs | Role                                    |
+|--------------|--------------|-----------------|---------|------|-----------------------------------------|
+| `k3s-master` | k3s-master   | 192.168.56.11   | 3072 MB | 2    | k3s control plane                       |
+| `k3s-worker1`| k3s-worker1  | 192.168.56.12   | 2048 MB | 1    | k3s worker node                         |
+| `k3s-worker2`| k3s-worker2  | 192.168.56.13   | 2048 MB | 1    | k3s worker node                         |
+| `runner-ci`  | runner-ci    | 192.168.56.10   | 2048 MB | 2    | GitHub Actions runner + container registry + monitoring/dashboard deploy |
+| **Total**    |   
 
 ## What Gets Provisioned
 
@@ -18,7 +18,10 @@ This directory contains the Vagrantfile and provisioning scripts for a local Kub
 - **Docker Engine** — used by workflows to build and push images
 - **registry:2** — local container registry listening on port 5000; k3s nodes pull from `192.168.56.10:5000`
 - **kubectl** — talks to the k3s API server via `/vagrant/kubeconfig` (written by the master provisioning script)
+- **Helm** — used to deploy the monitoring stack and available for interactive use
 - **GitHub Actions Runner** — self-hosted runner agent registered to this repo with the label `k8s-lab`
+- **Monitoring stack** — deployed via `setup-monitoring.sh` (second provisioner) after the k3s cluster is ready
+- **Headlamp dashboard** — deployed via `setup-dashboard.sh` (third provisioner) after the monitoring stack
 
 ### k3s-master (192.168.56.11)
 - Installs k3s server
@@ -43,7 +46,7 @@ cd cluster-infra/vm-setup
 vagrant up
 ```
 
-Vagrant provisions the VMs in order: `runner-ci` → `k3s-master` → `k3s-worker1` → `k3s-worker2`. The kubeconfig and join token are exchanged automatically through the shared `/vagrant` folder.
+Vagrant provisions the VMs in order: `k3s-master` → `k3s-worker1` → `k3s-worker2` → `runner-ci`. The k3s cluster is fully up before `runner-ci` provisions, so the monitoring install in `setup-monitoring.sh` can run without waiting. The kubeconfig and join token are exchanged automatically through the shared `/vagrant` folder.
 
 To bring up a single VM:
 
@@ -146,6 +149,89 @@ vagrant destroy -f
 # Re-provision a specific VM after script changes
 vagrant provision k3s-master
 ```
+
+## Monitoring
+The cluster ships with a full observability stack deployed automatically during provisioning.
+### Components
+| Component | Chart | Description |
+|-----------|-------|-------------|
+| **Prometheus** | `kube-prometheus-stack` | Metrics collection and storage (3-day retention) |
+| **Grafana** | `kube-prometheus-stack` | Dashboards and visualisations |
+| **node-exporter** | `kube-prometheus-stack` | Per-node hardware/OS metrics (DaemonSet) |
+| **kube-state-metrics** | `kube-prometheus-stack` | Kubernetes object metrics |
+| **Loki** | `loki` | Log aggregation (SingleBinary mode, 3-day retention) |
+| **Promtail** | `promtail` | Log shipping from all nodes (DaemonSet) |
+All components run in the `monitoring` namespace.
+### Accessing Grafana
+Open Grafana in your browser at **<http://192.168.56.12:30080>** (NodePort 30080 on any worker node IP, e.g. `.12` or `.13`).
+Default credentials: **admin / admin**
+Both Prometheus and Loki are pre-configured as datasources.
+
+### Dashboards
+Two sets of dashboards are pre-provisioned automatically.
+
+**Kubernetes compute dashboards** (built into `kube-prometheus-stack`) — metrics-focused views per cluster, namespace, node, pod, and workload. Found under **Dashboards → Default**.
+
+**Kubernetes Views** — a Grafana Cloud-style drilldown hierarchy for cluster inventory. Found under **Dashboards → Kubernetes Views**.
+
+| Dashboard | Grafana ID | What it shows |
+|-----------|-----------|---------------|
+| Kubernetes / System / API Server | 15761 | API server request rates, latency, and errors |
+| Kubernetes / System / CoreDNS | 15762 | CoreDNS query rates and latency |
+| Kubernetes / Views / Global | 15757 | Cluster-level overview: node/pod counts, CPU & memory by namespace |
+| Kubernetes / Views / Namespaces | 15758 | Per-namespace workload list and resource usage |
+| Kubernetes / Views / Nodes | 15759 | Per-node pod list, CPU/memory/disk |
+| Kubernetes / Views / Pods | 15760 | Per-pod container list, restarts, resource limits |
+
+Start at **Views / Global** and use the namespace/node/pod dropdowns at the top of each dashboard to drill down. These dashboards are loaded from grafana.com at Grafana startup (requires internet access from the VM).
+### Re-deploying / Updating the Monitoring Stack
+If you change the Helm values files (`cluster-infra/monitoring/*.yaml`), re-run the deploy script from the runner VM:
+```bash
+vagrant ssh runner-ci
+KUBECONFIG=/vagrant/kubeconfig bash /vagrant/vm-setup/setup-monitoring.sh
+```
+The script is idempotent (`helm upgrade --install`), so it is safe to run multiple times.
+### Memory Requirements
+The monitoring workloads require more RAM than a plain k3s cluster. The updated VM sizes are:
+- `k3s-master`: 3072 MB (was 2048 MB)
+- `k3s-worker1`: 2048 MB (was 1024 MB)
+- `k3s-worker2`: 2048 MB (was 1024 MB)
+## Dashboard
+
+The cluster includes [Headlamp](https://headlamp.dev/), a modern Kubernetes web UI deployed automatically during provisioning.
+
+### Accessing Headlamp
+
+Headlamp is exposed as NodePort 30090 on every cluster node. Open any of these in your browser:
+
+- **<http://192.168.56.12:30090>** (k3s-worker1)
+- **<http://192.168.56.13:30090>** (k3s-worker2)
+- **<http://192.168.56.11:30090>** (k3s-master — may require `sudo systemctl restart k3s` on the master if the NodePort was added after boot)
+
+### Authentication
+
+Headlamp requires a **service account bearer token** to log in. The Helm chart creates a service account named `headlamp` in the `dashboard` namespace with cluster-wide read access.
+
+Generate a login token:
+
+```bash
+kubectl create token headlamp -n dashboard
+```
+
+Copy the token output and paste it into the Headlamp login screen.
+
+### Re-deploying / Updating Headlamp
+
+If you change the Helm values (`cluster-infra/dashboard/headlamp-values.yaml`), re-run the deploy script from the runner VM:
+
+```bash
+vagrant ssh runner-ci
+KUBECONFIG=/vagrant/kubeconfig bash /vagrant/vm-setup/setup-dashboard.sh
+```
+
+The script is idempotent (`helm upgrade --install`), so it is safe to run multiple times.
+
+---
 
 ## Networking Notes
 
