@@ -1,3 +1,6 @@
+# Default namespace for k8s-lab. 
+# Note: Use more specific namespace if possible
+
 apiVersion: v1
 kind: Namespace
 metadata:
