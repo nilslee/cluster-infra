@@ -139,21 +139,46 @@ This means both paths get immediate sync with CI pass/fail feedback:
 | --- | --- |
 | `ARGOCD_AUTH_TOKEN` | ArgoCD API token used by the runner to authenticate against `argocd.k8s.lab` |
 
-### Generating and Storing the ArgoCD API Token (One-Time Manual Step)
+### Generating and Storing the ArgoCD API Token
 
-1. SSH into the runner VM:
-   ```bash
-   vagrant ssh runner-ci
-   ```
-2. Log in to ArgoCD and generate a long-lived API token for the `admin` account:
-   ```bash
-   argocd login argocd.k8s.lab --insecure --username admin --password <initial-password>
-   argocd account generate-token --account admin
-   ```
-   Copy the token printed to stdout.
-3. In the `cluster-infra` repo, go to **Settings → Secrets and variables → Actions → New repository secret** and add:
+The `setup-argocd.sh` provisioner generates the `ARGOCD_AUTH_TOKEN` automatically during `vagrant up`. At the end of provisioning you will see a summary block like:
+
+```
+============================================================
+ Argo CD provisioning complete
+============================================================
+ UI:                http://argocd.k8s.lab
+ Username:          admin
+ Initial password:  <generated-password>
+
+ ARGOCD_AUTH_TOKEN: <generated-token>
+============================================================
+```
+
+To store the token as a GitHub Actions secret so that `apply.yml` can authenticate against ArgoCD:
+
+1. In the `cluster-infra` repo, go to **Settings → Secrets and variables → Actions → New repository secret** and add:
    - **Name:** `ARGOCD_AUTH_TOKEN`
-   - **Value:** the token copied in step 2
+   - **Value:** the token printed in the provisioning output above
+
+If you need to retrieve these values again after provisioning, SSH into the runner VM:
+
+```bash
+vagrant ssh runner-ci
+```
+
+Re-run the relevant commands manually:
+
+```bash
+# Retrieve the initial admin password
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 -d && echo
+
+# Generate a fresh API token
+argocd login argocd.k8s.lab --insecure --grpc-web \
+  --username admin --password <password>
+argocd account generate-token --account admin --insecure --grpc-web
+```
 
 The token is passed to the workflow via the `ARGOCD_AUTH_TOKEN` environment variable and picked up automatically by the `argocd` CLI.
 

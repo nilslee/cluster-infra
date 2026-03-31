@@ -15,6 +15,9 @@ applicationSet:
 configs:
   params:
     server.insecure: "true"
+  cm:
+    # Allow the admin account to generate long-lived API tokens (used by CI).
+    accounts.admin: "apiKey, login"
 
 server:
   resources:
