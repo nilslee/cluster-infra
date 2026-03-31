@@ -56,5 +56,10 @@ chown -R vagrant:vagrant /home/vagrant/actions-runner
 # ── Helm ────────────────────────────────────────────────────────────────────
 curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
+# ── ArgoCD CLI ───────────────────────────────────────────────────────────────
+curl -sSL -o /usr/local/bin/argocd \
+  https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-arm64
+chmod +x /usr/local/bin/argocd
+
 echo "runner-ci provisioning complete."
 echo "Next step: register the GitHub Actions runner (see comments in this script or VM_README.md)."

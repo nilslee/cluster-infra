@@ -1,0 +1,17 @@
+name: Sync ArgoCD Applications
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: [self-hosted, k8s-lab]
+    steps:
+      - name: Sync all ArgoCD applications
+        env:
+          ARGOCD_SERVER: argocd.k8s.lab
+          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
+        run: |
+          argocd app sync namespaces my-redis --insecure --grpc-web --timeout 120
+          argocd app wait namespaces my-redis --insecure --grpc-web --timeout 120 --health

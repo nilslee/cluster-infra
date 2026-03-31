@@ -22,6 +22,7 @@ This directory contains the Vagrantfile and provisioning scripts for a local Kub
 - **registry:2** — local container registry listening on port 5000; k3s nodes pull from `192.168.56.10:5000`
 - **kubectl** — talks to the k3s API server via `/vagrant/kubeconfig` (written by the master provisioning script)
 - **Helm** — used to deploy the monitoring stack and available for interactive use
+- **ArgoCD CLI** — used by CI workflows to trigger immediate syncs after pushing to `cluster-infra`
 - **GitHub Actions Runner** — self-hosted runner agent registered to this repo with the label `k8s-lab`
 - **Networking stack** — MetalLB (L2) + NGINX Ingress Controller deployed via `setup-networking.sh` (second provisioner)
 - **Monitoring stack** — deployed via `setup-monitoring.sh` (third provisioner) after networking is ready
@@ -100,31 +101,69 @@ sudo ./svc.sh status   # from /opt/actions-runner
 
 ## GitHub Actions Workflows
 
-All cluster changes flow through a single path: **CI builds the image → CI bumps the tag in Git → Argo CD syncs the cluster**. No workflow ever runs `kubectl` against the cluster directly.
+Cluster changes flow through two complementary workflows. No workflow ever runs `kubectl apply` or `kubectl set image` directly against the cluster.
+
+```
+App repo: on push → docker build → docker push → kustomize edit set image → git push cluster-infra
+cluster-infra: on push to main → argocd app sync + wait (all apps)
+```
 
 ### App repos (`deploy.yml` — Build and Promote)
 
-Triggered on every push to `main`. Two steps:
+Triggered on every push to `main` in an app repo (e.g. `my-redis`). Two steps:
 
 1. **Build and push** — `docker build` + `docker push` to the local registry
 2. **Git bump** — clones `cluster-infra`, runs `kustomize edit set image` to update `newTag` in `k8s/apps/<app>/kustomization.yaml`, commits, and pushes
 
-```
-on: push → docker build → docker push → kustomize edit set image → git push cluster-infra
-```
+The workflow ends after the `git push`. The resulting commit to `cluster-infra` triggers `apply.yml` (below), which handles the ArgoCD sync.
 
-Argo CD detects the new commit and rolls out the updated image automatically.
+**Required secret (set in each app repo):**
 
-**Required secret:** `INFRA_REPO_PAT` — a GitHub PAT (or fine-grained token) with write access to the `cluster-infra` repo, stored as a repository secret in each app repo.
+| Secret | Purpose |
+| --- | --- |
+| `INFRA_REPO_PAT` | GitHub PAT (or fine-grained token) with write access to the `cluster-infra` repo |
 
 Runs on: `[self-hosted, k8s-lab]`
 
+### cluster-infra (`apply.yml` — Sync ArgoCD Applications)
+
+Triggered on every push to `main` in `cluster-infra` — whether that push came from an app repo's CI or from a direct human commit. Syncs all ArgoCD applications and waits for them to reach a healthy state before the job exits.
+
+This means both paths get immediate sync with CI pass/fail feedback:
+- App repo CI bumps the image tag → `apply.yml` fires automatically
+- You push a manifest change directly to `cluster-infra` → `apply.yml` fires automatically
+
+**Required secret (set in `cluster-infra`):**
+
+| Secret | Purpose |
+| --- | --- |
+| `ARGOCD_AUTH_TOKEN` | ArgoCD API token used by the runner to authenticate against `argocd.k8s.lab` |
+
+### Generating and Storing the ArgoCD API Token (One-Time Manual Step)
+
+1. SSH into the runner VM:
+   ```bash
+   vagrant ssh runner-ci
+   ```
+2. Log in to ArgoCD and generate a long-lived API token for the `admin` account:
+   ```bash
+   argocd login argocd.k8s.lab --insecure --username admin --password <initial-password>
+   argocd account generate-token --account admin
+   ```
+   Copy the token printed to stdout.
+3. In the `cluster-infra` repo, go to **Settings → Secrets and variables → Actions → New repository secret** and add:
+   - **Name:** `ARGOCD_AUTH_TOKEN`
+   - **Value:** the token copied in step 2
+
+The token is passed to the workflow via the `ARGOCD_AUTH_TOKEN` environment variable and picked up automatically by the `argocd` CLI.
+
 ### Manual Trigger
 
-The workflow includes `workflow_dispatch`, which adds a **Run workflow** button in the GitHub Actions UI. You can also trigger via the GitHub CLI:
+Both workflows include `workflow_dispatch`, which adds a **Run workflow** button in the GitHub Actions UI. You can also trigger via the GitHub CLI:
 
 ```bash
-gh workflow run deploy.yml --repo <yourname>/<repo>
+gh workflow run deploy.yml --repo <yourname>/<app-repo>
+gh workflow run apply.yml --repo <yourname>/cluster-infra
 ```
 
 ## Useful Commands
