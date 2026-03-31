@@ -1,0 +1,8 @@
+# Test namespace to check if argocli triggers immediate sync
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test
+  labels:
+    name: test
