@@ -10,7 +10,7 @@ This directory contains the Vagrantfile and provisioning scripts for a local Kub
 | `k3s-master`  | k3s-master  | 192.168.56.11 | 3072 MB | 2    | k3s control plane                                                        |
 | `k3s-worker1` | k3s-worker1 | 192.168.56.12 | 2048 MB | 1    | k3s worker node                                                          |
 | `k3s-worker2` | k3s-worker2 | 192.168.56.13 | 2048 MB | 1    | k3s worker node                                                          |
-| `runner-ci`   | runner-ci   | 192.168.56.10 | 2048 MB | 2    | GitHub Actions runner + container registry + monitoring/dashboard deploy |
+| `runner-ci`   | runner-ci   | 192.168.56.10 | 2048 MB | 2    | GitHub Actions runner + container registry + monitoring/dashboard/Argo CD deploy |
 | **Total**     |             |               |         |      |                                                                          |
 
 
@@ -26,6 +26,7 @@ This directory contains the Vagrantfile and provisioning scripts for a local Kub
 - **Networking stack** — MetalLB (L2) + NGINX Ingress Controller deployed via `setup-networking.sh` (second provisioner)
 - **Monitoring stack** — deployed via `setup-monitoring.sh` (third provisioner) after networking is ready
 - **Headlamp dashboard** — deployed via `setup-dashboard.sh` (fourth provisioner) after the monitoring stack
+- **Argo CD** — deployed via `setup-argocd.sh` (fifth provisioner); watches `cluster-infra` on GitHub and syncs all manifests under `k8s/` to the cluster automatically
 
 ### k3s-master (192.168.56.11)
 
@@ -99,33 +100,31 @@ sudo ./svc.sh status   # from /opt/actions-runner
 
 ## GitHub Actions Workflows
 
-Two workflow patterns are used:
+All cluster changes flow through a single path: **CI builds the image → CI bumps the tag in Git → Argo CD syncs the cluster**. No workflow ever runs `kubectl` against the cluster directly.
 
-### App repos (`deploy.yml`)
+### App repos (`deploy.yml` — Build and Promote)
 
-Triggered on every push to `main`. Builds a Docker image, pushes it to the local registry, then does a rolling update via `kubectl set image`:
+Triggered on every push to `main`. Two steps:
+
+1. **Build and push** — `docker build` + `docker push` to the local registry
+2. **Git bump** — clones `cluster-infra`, runs `kustomize edit set image` to update `newTag` in `k8s/apps/<app>/kustomization.yaml`, commits, and pushes
 
 ```
-on: push → docker build → docker push → kubectl set image
+on: push → docker build → docker push → kustomize edit set image → git push cluster-infra
 ```
+
+Argo CD detects the new commit and rolls out the updated image automatically.
+
+**Required secret:** `INFRA_REPO_PAT` — a GitHub PAT (or fine-grained token) with write access to the `cluster-infra` repo, stored as a repository secret in each app repo.
 
 Runs on: `[self-hosted, k8s-lab]`
 
-### Infra repo (`apply.yml`)
-
-Triggered on pushes to `main` that touch `cluster-infra/k8s/**`. Applies all manifests to the cluster:
-
-```
-on: push (k8s/**) → kubectl apply -R -f cluster-infra/k8s/
-```
-
 ### Manual Trigger
 
-Every workflow includes `workflow_dispatch`, which adds a **Run workflow** button in the GitHub Actions UI. You can also trigger via the GitHub CLI:
+The workflow includes `workflow_dispatch`, which adds a **Run workflow** button in the GitHub Actions UI. You can also trigger via the GitHub CLI:
 
 ```bash
 gh workflow run deploy.yml --repo <yourname>/<repo>
-gh workflow run apply.yml  --repo <yourname>/cluster-infra
 ```
 
 ## Useful Commands
@@ -249,6 +248,73 @@ The script is idempotent (`helm upgrade --install`), so it is safe to run multip
 
 ---
 
+## Argo CD (GitOps)
+
+The cluster uses [Argo CD](https://argo-cd.readthedocs.io/) as the single writer to the cluster. All desired state lives in Git; no workflow ever runs `kubectl apply` or `kubectl set image` directly.
+
+### How It Works
+
+```
+Developer push → CI builds image → CI bumps newTag in cluster-infra → Argo CD detects commit → Argo CD syncs cluster
+```
+
+Argo CD watches the `cluster-infra` GitHub repo and reconciles the cluster whenever a new commit lands on `main`. Two Applications are configured:
+
+| Application  | Path                  | Namespace | Sync policy          |
+| ------------ | --------------------- | --------- | -------------------- |
+| `namespaces` | `k8s/namespaces/`     | (various) | Auto-sync + selfHeal |
+| `my-redis`   | `k8s/apps/my-redis/`  | `k8s-lab` | Auto-sync + selfHeal |
+
+### Accessing Argo CD
+
+Open the Argo CD UI in your browser at **[http://argocd.k8s.lab](http://argocd.k8s.lab)** (routed through NGINX Ingress via MetalLB VIP).
+
+**Username:** `admin`
+
+**Initial password:** Printed at the end of `setup-argocd.sh` provisioning output. Retrieve it any time with:
+
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 -d && echo
+```
+
+Change the password after first login via **Settings → Account → Update Password**, then delete the bootstrap secret:
+
+```bash
+kubectl delete secret argocd-initial-admin-secret -n argocd
+```
+
+### Adding a New Application
+
+1. Create a Kustomize directory under `cluster-infra/k8s/apps/<app-name>/` with `kustomization.yaml`, `deployment.yaml`, etc.
+2. Add a new `Application` manifest to `cluster-infra/argocd/applications/<app-name>.yaml` (use `my-redis.yaml` as a template).
+3. Apply the Application CR (or let Argo CD pick it up on the next sync if you are using an App of Apps pattern):
+
+```bash
+kubectl apply -f cluster-infra/argocd/applications/<app-name>.yaml
+```
+
+### Re-deploying / Updating Argo CD
+
+If you change the Helm values (`cluster-infra/argocd/argocd-values.yaml`), re-run the deploy script from the runner VM:
+
+```bash
+vagrant ssh runner-ci
+KUBECONFIG=/vagrant/kubeconfig bash /vagrant/vm-setup/setup-argocd.sh
+```
+
+The script is idempotent (`helm upgrade --install`), so it is safe to run multiple times.
+
+### Memory Considerations
+
+Argo CD adds ~300–500 MB of RAM. The `k3s-master` VM has 3072 MB which is sufficient. Monitor usage with:
+
+```bash
+kubectl top pods -n argocd
+```
+
+---
+
 ## Networking
 
 ### Architecture
@@ -257,8 +323,9 @@ All HTTP traffic flows through a single MetalLB virtual IP into the NGINX Ingres
 
 ```
 macOS Host ──▶ MetalLB VIP (192.168.56.200) ──▶ NGINX Ingress Controller
-                                                    ├─ grafana.k8s.lab   → Grafana   (monitoring)
-                                                    ├─ headlamp.k8s.lab  → Headlamp  (dashboard)
+                                                    ├─ grafana.k8s.lab   → Grafana      (monitoring)
+                                                    ├─ headlamp.k8s.lab  → Headlamp     (dashboard)
+                                                    ├─ argocd.k8s.lab    → Argo CD      (argocd)
                                                     └─ app.k8s.lab       → App Services
 ```
 
@@ -274,13 +341,13 @@ macOS Host ──▶ MetalLB VIP (192.168.56.200) ──▶ NGINX Ingress Contro
 Add the following to `/etc/hosts` on your macOS host so that browsers can resolve the `.k8s.lab` hostnames to the MetalLB VIP:
 
 ```bash
-sudo sh -c 'echo "192.168.56.200 grafana.k8s.lab headlamp.k8s.lab app.k8s.lab" >> /etc/hosts'
+sudo sh -c 'echo "192.168.56.200 grafana.k8s.lab headlamp.k8s.lab argocd.k8s.lab app.k8s.lab" >> /etc/hosts'
 ```
 
 Or manually add this line to `/etc/hosts`:
 
 ```
-192.168.56.200 grafana.k8s.lab headlamp.k8s.lab app.k8s.lab
+192.168.56.200 grafana.k8s.lab headlamp.k8s.lab argocd.k8s.lab app.k8s.lab
 ```
 
 `192.168.56.200` is the first address MetalLB assigns from its pool to the NGINX Ingress Controller's LoadBalancer Service.

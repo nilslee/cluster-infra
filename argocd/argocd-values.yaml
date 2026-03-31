@@ -1,0 +1,56 @@
+# Helm values for argo/argo-cd -- tuned for the k8s-lab VMs (3072 MB master).
+# Deployed into the `argocd` namespace by setup-argocd.sh.
+# ── Disabled components ───────────────────────────────────────────────────────
+dex:
+  enabled: false
+
+notifications:
+  enabled: false
+
+applicationSet:
+  enabled: false
+
+# ── Server ────────────────────────────────────────────────────────────────────
+# Run insecure (plain HTTP); TLS is terminated at the NGINX Ingress Controller.
+configs:
+  params:
+    server.insecure: "true"
+
+server:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# ── Application controller ────────────────────────────────────────────────────
+controller:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ── Repo server ───────────────────────────────────────────────────────────────
+repoServer:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# ── Bundled Redis ─────────────────────────────────────────────────────────────
+redis:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
