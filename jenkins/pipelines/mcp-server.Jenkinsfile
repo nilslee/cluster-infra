@@ -3,25 +3,10 @@ pipeline {
     environment {
         CONTAINER_NAME  = 'mcp-server'
         IMAGE_NAME      = 'mcp-server:latest'
-        MCP_PORT        = '8080'
+        MCP_PORT        = '9000'
         KUBECONFIG_PATH = '/vagrant/kubeconfig'
-        VIP_HOSTS       = '192.168.56.200 prometheus.k8s.lab loki.k8s.lab argocd.k8s.lab grafana.k8s.lab headlamp.k8s.lab'
     }
     stages {
-        stage('Preflight -- DNS Setup') {
-            steps {
-                // The MCP container uses --network=host so it inherits the VM's /etc/hosts.
-                // Ensure MetalLB VIP entries exist so the server can resolve Ingress hostnames.
-                sh '''
-                    if ! grep -q "prometheus.k8s.lab" /etc/hosts; then
-                        echo "${VIP_HOSTS}" | sudo tee -a /etc/hosts
-                        echo "Added k8s.lab host entries to /etc/hosts"
-                    else
-                        echo "k8s.lab host entries already present"
-                    fi
-                '''
-            }
-        }
         stage('Preflight -- Kubeconfig') {
             steps {
                 // Fail fast if the kubeconfig hasn't been written by k3s-master yet
@@ -35,7 +20,7 @@ pipeline {
         }
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/aaronlee232/mcp.git', branch: 'main'
+                git url: 'https://github.com/nilslee/k8s-lab-mcp.git', branch: 'main', credentialsId: 'github-pat'
             }
         }
         stage('Build Image') {

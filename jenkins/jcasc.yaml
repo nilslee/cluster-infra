@@ -16,20 +16,20 @@ credentials:
           - usernamePassword:
               scope: GLOBAL
               id: "github-pat"
-              username: "aaronlee232"
+              username: "x-access-token"
               password: "${GITHUB_PAT}"
-              description: "PAT for cloning repos and pushing to cluster-infra"
+              description: "GitHub PAT (classic token with repo scope) for cloning repos and pushing to cluster-infra"
 
 unclassified:
   location:
     url: "http://192.168.56.10:8080/"
 
 jobs:
-  - script: >
+  - script: |
       pipelineJob('my-redis') {
           definition {
               cps {
-                  script(readFileFromWorkspace('/jenkins/pipelines/my-redis.Jenkinsfile'))
+                  script(new File('/jenkins/pipelines/my-redis.Jenkinsfile').text)
                   sandbox(true)
               }
           }
@@ -41,7 +41,7 @@ jobs:
       pipelineJob('redis-gui-tester') {
           definition {
               cps {
-                  script(readFileFromWorkspace('/jenkins/pipelines/redis-gui-tester.Jenkinsfile'))
+                  script(new File('/jenkins/pipelines/redis-gui-tester.Jenkinsfile').text)
                   sandbox(true)
               }
           }
@@ -53,7 +53,7 @@ jobs:
       pipelineJob('mcp-server') {
           definition {
               cps {
-                  script(readFileFromWorkspace('/jenkins/pipelines/mcp-server.Jenkinsfile'))
+                  script(new File('/jenkins/pipelines/mcp-server.Jenkinsfile').text)
                   sandbox(true)
               }
           }

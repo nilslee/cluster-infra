@@ -8,7 +8,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git url: "https://github.com/aaronlee232/${APP}.git", branch: 'main'
+                git url: "https://github.com/aaronlee232/${APP}.git", branch: 'main', credentialsId: 'github-pat'
             }
         }
         stage('Build and Push') {

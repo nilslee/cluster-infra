@@ -1,7 +1,7 @@
 pipelineJob('my-redis') {
     definition {
         cps {
-            script(readFileFromWorkspace('/jenkins/pipelines/my-redis.Jenkinsfile'))
+            script(new File('/jenkins/pipelines/my-redis.Jenkinsfile').text)
             sandbox(true)
         }
     }
@@ -13,7 +13,7 @@ pipelineJob('my-redis') {
 pipelineJob('redis-gui-tester') {
     definition {
         cps {
-            script(readFileFromWorkspace('/jenkins/pipelines/redis-gui-tester.Jenkinsfile'))
+            script(new File('/jenkins/pipelines/redis-gui-tester.Jenkinsfile').text)
             sandbox(true)
         }
     }
@@ -25,11 +25,11 @@ pipelineJob('redis-gui-tester') {
 pipelineJob('mcp-server') {
     definition {
         cps {
-            script(readFileFromWorkspace('/jenkins/pipelines/mcp-server.Jenkinsfile'))
+            script(new File('/jenkins/pipelines/mcp-server.Jenkinsfile').text)
             sandbox(true)
         }
     }
     triggers {
-        scm('H/5 * * * *')
+        scm('H/2 * * * *')
     }
 }

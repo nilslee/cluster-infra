@@ -27,7 +27,7 @@ This directory contains the Vagrantfile and provisioning scripts for a local Kub
 - **Monitoring stack** — deployed via `setup-monitoring.sh` (third provisioner) after networking is ready
 - **Headlamp dashboard** — deployed via `setup-dashboard.sh` (fourth provisioner) after the monitoring stack
 - **Argo CD** — deployed via `setup-argocd.sh` (fifth provisioner); watches `cluster-infra` on GitHub and syncs all manifests under `k8s/` to the cluster automatically
-- **MCP Server** — deployed by the `mcp-server` Jenkins pipeline (not provisioned at boot); builds and runs the Spring AI MCP server as a Docker container (`mcp-server`) on port 8080, constrained to 512 MB RAM
+- **MCP Server** — deployed by the `mcp-server` Jenkins pipeline (not provisioned at boot); builds and runs the Spring AI MCP server as a Docker container (`mcp-server`) on port 9000, constrained to 512 MB RAM
 
 ### k3s-master (192.168.56.11)
 
@@ -130,11 +130,13 @@ vagrant ssh runner-ci -c "systemctl status jenkins"
 
 ### Re-applying Jenkins Configuration
 
-If you change `jcasc.yaml`, `plugins.txt`, or any Jenkinsfile, re-run the provisioner:
+The `cluster-infra/jenkins/` folder is synced to `/jenkins/` on the VM via **rsync**, which only runs automatically at `vagrant up` time. When iterating on `jcasc.yaml`, `plugins.txt`, or any Jenkinsfile, you must resync the folder first, then re-run the provisioner:
 
 ```bash
-vagrant provision runner-ci --provision-with jenkins
+vagrant rsync runner-ci && vagrant provision runner-ci --provision-with jenkins
 ```
+
+`setup-jenkins.sh` itself lives in `vm-setup/` which is always up-to-date on the VM via the default VirtualBox shared folder (`/vagrant`), so changes to it are reflected immediately without a resync.
 
 ## Useful Commands
 
@@ -333,7 +335,7 @@ The runner-ci VM hosts the [Spring AI MCP server](../../mcp/) which gives Cursor
 The MCP server runs as a Docker container on runner-ci. Cursor connects to it over the host-only network using the streamable HTTP transport:
 
 ```
-Cursor (macOS) ──▶ http://192.168.56.10:8080/mcp ──▶ mcp-server container
+Cursor (macOS) ──▶ http://192.168.56.10:9000/mcp ──▶ mcp-server container
                                                           ├─ Kubernetes API  192.168.56.11:6443  (via kubeconfig)
                                                           ├─ Prometheus       prometheus.k8s.lab  (via Ingress)
                                                           ├─ Loki             loki.k8s.lab        (via Ingress)
@@ -348,7 +350,7 @@ Add to `~/.cursor/mcp.json` on your macOS host:
 {
   "mcpServers": {
     "k8s-lab": {
-      "url": "http://192.168.56.10:8080/mcp"
+      "url": "http://192.168.56.10:9000/mcp"
     }
   }
 }
@@ -360,7 +362,7 @@ The MCP server is **not** started at `vagrant up` time — it is treated as a de
 
 1. Open [http://192.168.56.10:8080](http://192.168.56.10:8080) → **mcp-server** job → **Build Now**
 
-Subsequent updates are triggered automatically by SCM polling (every 5 minutes) when commits land on the `mcp` repo's `main` branch.
+Subsequent updates are triggered automatically by SCM polling (every 5 minutes) when changes are made to the local `./mcp/` directory (the Jenkins pipeline copies it from `/mcp` on the VM).
 
 The pipeline is idempotent — it stops and removes the old container before starting a new one.
 
