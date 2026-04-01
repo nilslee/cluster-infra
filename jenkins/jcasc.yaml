@@ -24,40 +24,6 @@ unclassified:
   location:
     url: "http://192.168.56.10:8080/"
 
-jobs:
-  - script: |
-      pipelineJob('my-redis') {
-          definition {
-              cps {
-                  script(new File('/jenkins/pipelines/my-redis.Jenkinsfile').text)
-                  sandbox(true)
-              }
-          }
-          triggers {
-              scm('H/2 * * * *')
-          }
-      }
-
-      pipelineJob('redis-gui-tester') {
-          definition {
-              cps {
-                  script(new File('/jenkins/pipelines/redis-gui-tester.Jenkinsfile').text)
-                  sandbox(true)
-              }
-          }
-          triggers {
-              scm('H/2 * * * *')
-          }
-      }
-
-      pipelineJob('mcp-server') {
-          definition {
-              cps {
-                  script(new File('/jenkins/pipelines/mcp-server.Jenkinsfile').text)
-                  sandbox(true)
-              }
-          }
-          triggers {
-              scm('H/5 * * * *')
-          }
-      }
+# The pipeline jobs are created by the seed job below.
+# This avoids the circular dependency between JCasC and Job DSL.
+# The actual pipeline definitions are loaded from the Jenkinsfiles in /jenkins/pipelines/

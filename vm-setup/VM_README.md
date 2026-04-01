@@ -120,7 +120,9 @@ All cluster changes flow through a single path: **Jenkins builds the image → J
 git push → Jenkins SCM poll → docker build → docker push → kustomize edit set image → git push cluster-infra → ArgoCD sync
 ```
 
-SCM polling interval: every 2 minutes for app pipelines, every 5 minutes for `mcp-server`.
+SCM polling interval: every 2 minutes for app pipelines (`my-redis`, `redis-gui-tester`), every 5 minutes for `mcp-server`.
+
+**Note:** Jenkins only shows polling activity in the job's "SCM Polling Log" (not in the main build history) when changes are detected. You can check polling status by going to each job → "SCM Polling Log".
 
 ### Check Jenkins Status
 
