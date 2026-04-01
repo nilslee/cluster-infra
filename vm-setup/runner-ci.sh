@@ -27,34 +27,8 @@ mkdir -p /home/vagrant/.kube
 ln -sf /vagrant/kubeconfig /home/vagrant/.kube/config
 chown -h vagrant:vagrant /home/vagrant/.kube/config
 
-# ── GitHub Actions Runner ─────────────────────────────────────────────────────
-RUNNER_VERSION="2.322.0"
-RUNNER_ARCH="arm64"
-RUNNER_PKG="actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz"
-
-# Download runner into the vagrant home directory
-cd /home/vagrant
-mkdir -p actions-runner && cd actions-runner
-
-curl -fsSLo "${RUNNER_PKG}" \
-  "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/${RUNNER_PKG}"
-
-# Extract
-tar xzf "${RUNNER_PKG}"
-rm "${RUNNER_PKG}"
-chown -R vagrant:vagrant /home/vagrant/actions-runner
-
-# Configure and register the runner (run as the vagrant user).
-# Replace <REPO_URL> and <TOKEN> before provisioning, or run manually after:
-#   sudo -u vagrant ./config.sh --url <REPO_URL> --token <TOKEN> \
-#     --name runner-ci --labels k8s-lab --unattended
-#
-# Then install and start as a systemd service:
-#   sudo ./svc.sh install vagrant
-#   sudo ./svc.sh start
-
 # ── Helm ────────────────────────────────────────────────────────────────────
 curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
-echo "runner-ci provisioning complete."
-echo "Next step: register the GitHub Actions runner (see comments in this script or VM_README.md)."
+echo "runner-ci base provisioning complete."
+echo "Jenkins is provisioned separately by setup-jenkins.sh."

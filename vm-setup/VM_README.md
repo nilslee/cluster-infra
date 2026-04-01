@@ -10,7 +10,7 @@ This directory contains the Vagrantfile and provisioning scripts for a local Kub
 | `k3s-master`  | k3s-master  | 192.168.56.11 | 3072 MB | 2    | k3s control plane                                                        |
 | `k3s-worker1` | k3s-worker1 | 192.168.56.12 | 2048 MB | 1    | k3s worker node                                                          |
 | `k3s-worker2` | k3s-worker2 | 192.168.56.13 | 2048 MB | 1    | k3s worker node                                                          |
-| `runner-ci`   | runner-ci   | 192.168.56.10 | 2048 MB | 2    | GitHub Actions runner + container registry + monitoring/dashboard/Argo CD deploy |
+| `runner-ci`   | runner-ci   | 192.168.56.10 | 4096 MB | 2    | Jenkins CI + container registry + monitoring/dashboard/Argo CD deploy + MCP server |
 | **Total**     |             |               |         |      |                                                                          |
 
 
@@ -18,15 +18,16 @@ This directory contains the Vagrantfile and provisioning scripts for a local Kub
 
 ### runner-ci (192.168.56.10)
 
-- **Docker Engine** — used by workflows to build and push images
+- **Docker Engine** — used by Jenkins pipelines to build and push images
 - **registry:2** — local container registry listening on port 5000; k3s nodes pull from `192.168.56.10:5000`
 - **kubectl** — talks to the k3s API server via `/vagrant/kubeconfig` (written by the master provisioning script)
 - **Helm** — used to deploy the monitoring stack and available for interactive use
-- **GitHub Actions Runner** — self-hosted runner agent registered to this repo with the label `k8s-lab`
+- **Jenkins LTS** — deployed via `setup-jenkins.sh` (sixth provisioner); configured entirely via JCasC (`cluster-infra/jenkins/jcasc.yaml`) with no manual setup required
 - **Networking stack** — MetalLB (L2) + NGINX Ingress Controller deployed via `setup-networking.sh` (second provisioner)
 - **Monitoring stack** — deployed via `setup-monitoring.sh` (third provisioner) after networking is ready
 - **Headlamp dashboard** — deployed via `setup-dashboard.sh` (fourth provisioner) after the monitoring stack
 - **Argo CD** — deployed via `setup-argocd.sh` (fifth provisioner); watches `cluster-infra` on GitHub and syncs all manifests under `k8s/` to the cluster automatically
+- **MCP Server** — deployed by the `mcp-server` Jenkins pipeline (not provisioned at boot); builds and runs the Spring AI MCP server as a Docker container (`mcp-server`) on port 8080, constrained to 512 MB RAM
 
 ### k3s-master (192.168.56.11)
 
@@ -44,7 +45,7 @@ This directory contains the Vagrantfile and provisioning scripts for a local Kub
 
 - [Vagrant](https://www.vagrantup.com/) ≥ 2.3
 - [VirtualBox](https://www.virtualbox.org/) ≥ 7.0
-- A GitHub account with a repository (or organisation) to register the runner against
+- A GitHub PAT with read access to the app repos and write access to `cluster-infra` (injected as `GITHUB_PAT` env var — see [Jenkins CI](#jenkins-ci))
 
 ## Starting the Cluster
 
@@ -62,69 +63,77 @@ vagrant up runner-ci
 vagrant up k3s-master
 ```
 
-## Runner Registration (One-Time Manual Step)
+## Jenkins CI
 
-The provisioning script installs the runner binary but registration requires a token from GitHub — this is intentionally a manual step to avoid storing credentials in the repo.
+Jenkins replaces the GitHub Actions self-hosted runner. It is fully configured at provisioning time via [Jenkins Configuration as Code (JCasC)](https://www.jenkins.io/projects/jcasc/) — no manual setup is required after `vagrant up`.
 
-1. Go to your GitHub repository (or organisation) → **Settings** → **Actions** → **Runners** → **New self-hosted runner**
-2. Copy the registration token shown on that page
-3. SSH into the runner VM:
-  ```bash
-   vagrant ssh runner-ci
-  ```
-4. Run the configuration command (replace `<ORG_OR_REPO_URL>` and `<TOKEN>`):
-  ```bash
-   cd /opt/actions-runner
-   ./config.sh --url https://github.com/<ORG_OR_REPO_URL> \
-     --token <TOKEN> \
-     --labels k8s-lab \
-     --unattended
-  ```
-5. Install and start the runner as a systemd service so it survives reboots:
-  ```bash
-   sudo ./svc.sh install
-   sudo ./svc.sh start
-  ```
+### Accessing Jenkins
 
-### Check Runner Status
+Open the Jenkins UI in your browser at **[http://192.168.56.10:8080](http://192.168.56.10:8080)**.
 
-```bash
-vagrant ssh runner-ci -c "systemctl status actions.runner.*"
-```
+**Username:** `admin`  
+**Password:** value of `JENKINS_ADMIN_PASSWORD` set in `/etc/default/jenkins` on the VM (defaults to `admin` for lab use)
 
-Or from inside the VM:
+### Configuration Files
 
-```bash
-sudo ./svc.sh status   # from /opt/actions-runner
-```
+All Jenkins configuration lives in `cluster-infra/jenkins/` and is rsynced to `/jenkins/` on the VM at provisioning time:
 
-## GitHub Actions Workflows
+| File | Purpose |
+| ---- | ------- |
+| `jenkins/jcasc.yaml` | Single source of truth — security realm, credentials, job definitions |
+| `jenkins/plugins.txt` | Plugin manifest installed by `jenkins-plugin-cli` at provisioning time |
+| `jenkins/seed-jobs.groovy` | Job DSL script (also inlined in `jcasc.yaml`) that creates all pipeline jobs |
+| `jenkins/pipelines/my-redis.Jenkinsfile` | Build-and-promote pipeline for `my-redis` |
+| `jenkins/pipelines/redis-gui-tester.Jenkinsfile` | Build-and-promote pipeline for `redis-gui-tester` |
+| `jenkins/pipelines/mcp-server.Jenkinsfile` | Full-setup pipeline for the MCP server |
 
-All cluster changes flow through a single path: **CI builds the image → CI bumps the tag in Git → Argo CD syncs the cluster**. No workflow ever runs `kubectl` against the cluster directly.
+### Credentials
 
-### App repos (`deploy.yml` — Build and Promote)
+Two credentials are injected at provisioning time via environment variables — never stored in Git:
 
-Triggered on every push to `main`. Two steps:
+| Env Var | Jenkins Credential ID | Purpose |
+| ------- | --------------------- | ------- |
+| `JENKINS_ADMIN_PASSWORD` | — | Admin UI password |
+| `GITHUB_PAT` | `github-pat` | PAT for cloning app repos and pushing to `cluster-infra` |
 
-1. **Build and push** — `docker build` + `docker push` to the local registry
-2. **Git bump** — clones `cluster-infra`, runs `kustomize edit set image` to update `newTag` in `k8s/apps/<app>/kustomization.yaml`, commits, and pushes
-
-```
-on: push → docker build → docker push → kustomize edit set image → git push cluster-infra
-```
-
-Argo CD detects the new commit and rolls out the updated image automatically.
-
-**Required secret:** `INFRA_REPO_PAT` — a GitHub PAT (or fine-grained token) with write access to the `cluster-infra` repo, stored as a repository secret in each app repo.
-
-Runs on: `[self-hosted, k8s-lab]`
-
-### Manual Trigger
-
-The workflow includes `workflow_dispatch`, which adds a **Run workflow** button in the GitHub Actions UI. You can also trigger via the GitHub CLI:
+Set these before `vagrant up` (or re-provision with them set) by exporting them in your shell:
 
 ```bash
-gh workflow run deploy.yml --repo <yourname>/<repo>
+export JENKINS_ADMIN_PASSWORD=mysecretpassword
+export GITHUB_PAT=ghp_xxxxxxxxxxxx
+vagrant up
+```
+
+Or edit `/etc/default/jenkins` inside the VM and restart Jenkins:
+
+```bash
+vagrant ssh runner-ci
+sudo nano /etc/default/jenkins
+sudo systemctl restart jenkins
+```
+
+### CI Pipeline Flow
+
+All cluster changes flow through a single path: **Jenkins builds the image → Jenkins bumps the tag in Git → Argo CD syncs the cluster**. No pipeline ever runs `kubectl apply` or `kubectl set image` directly.
+
+```
+git push → Jenkins SCM poll → docker build → docker push → kustomize edit set image → git push cluster-infra → ArgoCD sync
+```
+
+SCM polling interval: every 2 minutes for app pipelines, every 5 minutes for `mcp-server`.
+
+### Check Jenkins Status
+
+```bash
+vagrant ssh runner-ci -c "systemctl status jenkins"
+```
+
+### Re-applying Jenkins Configuration
+
+If you change `jcasc.yaml`, `plugins.txt`, or any Jenkinsfile, re-run the provisioner:
+
+```bash
+vagrant provision runner-ci --provision-with jenkins
 ```
 
 ## Useful Commands
@@ -311,6 +320,54 @@ Argo CD adds ~300–500 MB of RAM. The `k3s-master` VM has 3072 MB which is suff
 
 ```bash
 kubectl top pods -n argocd
+```
+
+---
+
+## MCP Server
+
+The runner-ci VM hosts the [Spring AI MCP server](../../mcp/) which gives Cursor IDE live access to the cluster's Kubernetes API, Prometheus metrics, Loki logs, and ArgoCD state.
+
+### How It Works
+
+The MCP server runs as a Docker container on runner-ci. Cursor connects to it over the host-only network using the streamable HTTP transport:
+
+```
+Cursor (macOS) ──▶ http://192.168.56.10:8080/mcp ──▶ mcp-server container
+                                                          ├─ Kubernetes API  192.168.56.11:6443  (via kubeconfig)
+                                                          ├─ Prometheus       prometheus.k8s.lab  (via Ingress)
+                                                          ├─ Loki             loki.k8s.lab        (via Ingress)
+                                                          └─ ArgoCD           argocd.k8s.lab      (via Ingress)
+```
+
+### Cursor MCP Config
+
+Add to `~/.cursor/mcp.json` on your macOS host:
+
+```json
+{
+  "mcpServers": {
+    "k8s-lab": {
+      "url": "http://192.168.56.10:8080/mcp"
+    }
+  }
+}
+```
+
+### Deploying / Updating via Jenkins
+
+The MCP server is **not** started at `vagrant up` time — it is treated as a deployed application managed by the `mcp-server` Jenkins pipeline. After a fresh `vagrant up`, trigger the first deploy manually:
+
+1. Open [http://192.168.56.10:8080](http://192.168.56.10:8080) → **mcp-server** job → **Build Now**
+
+Subsequent updates are triggered automatically by SCM polling (every 5 minutes) when commits land on the `mcp` repo's `main` branch.
+
+The pipeline is idempotent — it stops and removes the old container before starting a new one.
+
+### Checking Container Status
+
+```bash
+vagrant ssh runner-ci -c "docker ps && docker logs mcp-server --tail 20"
 ```
 
 ---

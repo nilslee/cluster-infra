@@ -56,10 +56,12 @@ Vagrant.configure("2") do |config|
       rsync__exclude: [".git/"]
     ci.vm.synced_folder "../argocd", "/argocd", type: "rsync",
       rsync__exclude: [".git/"]
+    ci.vm.synced_folder "../jenkins", "/jenkins", type: "rsync",
+      rsync__exclude: [".git/"]
 
     ci.vm.network "private_network", ip: "192.168.56.10"
     ci.vm.provider "virtualbox" do |vb|
-      vb.memory = "2048"
+      vb.memory = "4096"
       vb.cpus = 2
     end
     ci.vm.provision "shell", path: "runner-ci.sh"
@@ -67,6 +69,7 @@ Vagrant.configure("2") do |config|
     ci.vm.provision "shell", path: "setup-monitoring.sh"
     ci.vm.provision "shell", path: "setup-dashboard.sh"
     ci.vm.provision "shell", path: "setup-argocd.sh"
+    ci.vm.provision "jenkins", type: "shell", path: "setup-jenkins.sh"
   end
 
   # Disable automatic box update checking. If you disable this, then
