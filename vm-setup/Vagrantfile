@@ -70,6 +70,7 @@ Vagrant.configure("2") do |config|
     ci.vm.provision "shell", path: "setup-networking.sh"
     ci.vm.provision "shell", path: "setup-monitoring.sh"
     ci.vm.provision "shell", path: "setup-dashboard.sh"
+    ci.vm.provision "shell", path: "setup-coredns-dns.sh"
     ci.vm.provision "shell", path: "setup-argocd.sh"
     ci.vm.provision "jenkins", type: "shell", path: "setup-jenkins.sh"
   end

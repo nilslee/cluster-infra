@@ -36,19 +36,19 @@ controller:
       memory: 512Mi
 
 # ── Repo server ───────────────────────────────────────────────────────────────
-# Defaults use timeoutSeconds: 1; on constrained nodes the metrics health handler
-# can exceed that (see repo-server logs: ~2s), causing liveness kills and RPC failures.
+# Liveness uses /healthz?full=true; on slow nodes it can exceed 5s (logs show ~6s+),
+# which still kills the container and causes intermittent RPC connection refused.
 repoServer:
   readinessProbe:
-    timeoutSeconds: 5
+    timeoutSeconds: 10
   livenessProbe:
-    timeoutSeconds: 5
+    timeoutSeconds: 15
   resources:
     requests:
-      cpu: 100m
+      cpu: 200m
       memory: 256Mi
     limits:
-      cpu: 500m
+      cpu: "1"
       memory: 512Mi
 
 # ── Bundled Redis ─────────────────────────────────────────────────────────────
