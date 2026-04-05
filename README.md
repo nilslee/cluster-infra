@@ -4,7 +4,9 @@ Local Kubernetes lab on **VirtualBox** and **Vagrant**: a **k3s** control plane 
 
 ## Architecture
 
-- **GitOps / CI:** Jenkins builds images, pushes to the local registry, updates image tags in this repository, and pushes; Argo CD watches the repo and syncs manifests under `k8s/` to the cluster.
+### GitOps / CI:
+
+Jenkins builds images, pushes to the local registry, updates image tags in this repository, and pushes; Argo CD watches the repo and syncs manifests under `k8s/` to the cluster.
 
 ```mermaid
 flowchart LR
@@ -15,16 +17,24 @@ flowchart LR
   devPush --> jenkins --> bump --> argo
 ```
 
-- **Ingress:** Traffic from your Mac hits a **MetalLB** virtual IP, then the **NGINX Ingress Controller**, which routes by hostname (for example `grafana.k8s.lab`, `argocd.k8s.lab`). See [vm-setup/VM_README.md](vm-setup/VM_README.md#networking) for the full picture.
+![GitOps Deployment](<./GitOps%20Deployment%20(Pull%20+%20Jenkins).svg>)
+_Full GitOps CI/CD diagram_
+
+### Ingress:
+
+Traffic from your Mac hits a **MetalLB** virtual IP, then the **NGINX Ingress Controller**, which routes by hostname (for example `grafana.k8s.lab`, `argocd.k8s.lab`). See [vm-setup/VM_README.md](vm-setup/VM_README.md#networking) for the full picture.
+
+![Full Cluster Architecture Diagram](./VM%20Cluster%20Architecture.svg)
+_Full Cluster Architecture Diagram_
 
 ## VMs
 
-| VM | Hostname | IP | RAM | CPUs | Role |
-| -- | -------- | -- | --- | ---- | ---- |
-| `k3s-master` | k3s-master | 192.168.56.11 | 3072 MB | 2 | k3s control plane |
-| `k3s-worker1` | k3s-worker1 | 192.168.56.12 | 2048 MB | 1 | k3s worker |
-| `k3s-worker2` | k3s-worker2 | 192.168.56.13 | 2048 MB | 1 | k3s worker |
-| `runner-ci` | runner-ci | 192.168.56.10 | 4096 MB | 2 | Jenkins, registry, Helm deploys, MCP host |
+| VM            | Hostname    | IP            | RAM     | CPUs | Role                                      |
+| ------------- | ----------- | ------------- | ------- | ---- | ----------------------------------------- |
+| `k3s-master`  | k3s-master  | 192.168.56.11 | 3072 MB | 2    | k3s control plane                         |
+| `k3s-worker1` | k3s-worker1 | 192.168.56.12 | 2048 MB | 1    | k3s worker                                |
+| `k3s-worker2` | k3s-worker2 | 192.168.56.13 | 2048 MB | 1    | k3s worker                                |
+| `runner-ci`   | runner-ci   | 192.168.56.10 | 4096 MB | 2    | Jenkins, registry, Helm deploys, MCP host |
 
 ## Prerequisites
 
@@ -57,25 +67,25 @@ Manual line:
 
 ## Service URLs
 
-| Service | URL |
-| ------- | --- |
-| Jenkins | [http://192.168.56.10:8080](http://192.168.56.10:8080) |
-| Grafana | [http://grafana.k8s.lab](http://grafana.k8s.lab) |
-| Headlamp | [http://headlamp.k8s.lab](http://headlamp.k8s.lab) |
-| Argo CD | [http://argocd.k8s.lab](http://argocd.k8s.lab) |
+| Service                       | URL                                                                                                                                                                                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Jenkins                       | [http://192.168.56.10:8080](http://192.168.56.10:8080)                                                                                                                                                                                                                                |
+| Grafana                       | [http://grafana.k8s.lab](http://grafana.k8s.lab)                                                                                                                                                                                                                                      |
+| Headlamp                      | [http://headlamp.k8s.lab](http://headlamp.k8s.lab)                                                                                                                                                                                                                                    |
+| Argo CD                       | [http://argocd.k8s.lab](http://argocd.k8s.lab)                                                                                                                                                                                                                                        |
 | MCP (Cursor, streamable HTTP) | `http://192.168.56.10:9000/mcp` — configure in `~/.cursor/mcp.json`; first deploy via Jenkins **mcp-server** job. Server source and tool docs: [nilslee/k8s-lab-mcp](https://github.com/nilslee/k8s-lab-mcp). Lab wiring: [VM_README — MCP Server](vm-setup/VM_README.md#mcp-server). |
 
 Default Grafana login is **admin / admin** (change in production-style use). Jenkins admin password: see the VM guide.
 
 ## Repository layout
 
-| Path | Contents |
-| ---- | -------- |
-| [k8s/](k8s/) | Hosted application manifests (namespaces, app Kustomize) |
-| [argocd/](argocd/) | Argo CD Helm values, ingress, Application CRs |
-| [jenkins/](jenkins/) | JCasC, plugins, pipelines |
-| [monitoring/](monitoring/), [dashboard/](dashboard/), [networking/](networking/) | Helm values and related manifests |
-| [vm-setup/](vm-setup/) | `Vagrantfile`, provisioning scripts, [VM_README.md](vm-setup/VM_README.md) |
+| Path                                                                             | Contents                                                                   |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| [k8s/](k8s/)                                                                     | Hosted application manifests (namespaces, app Kustomize)                   |
+| [argocd/](argocd/)                                                               | Argo CD Helm values, ingress, Application CRs                              |
+| [jenkins/](jenkins/)                                                             | JCasC, plugins, pipelines                                                  |
+| [monitoring/](monitoring/), [dashboard/](dashboard/), [networking/](networking/) | Helm values and related manifests                                          |
+| [vm-setup/](vm-setup/)                                                           | `Vagrantfile`, provisioning scripts, [VM_README.md](vm-setup/VM_README.md) |
 
 The MCP server runs in the `runner-ci` VM and is a separate codebase: **[github.com/nilslee/k8s-lab-mcp](https://github.com/nilslee/k8s-lab-mcp)**.
 
