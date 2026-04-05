@@ -1,6 +1,6 @@
 # k8s-lab VM Setup
 
-This directory contains the Vagrantfile and provisioning scripts for a local Kubernetes lab cluster running on VirtualBox.
+This directory contains the Vagrantfile and provisioning scripts for the lab. For a project overview, quick start, service URLs, and `/etc/hosts` setup, see the [repository README](../README.md).
 
 ## VM Layout
 
@@ -337,7 +337,7 @@ kubectl top pods -n argocd
 
 ## MCP Server
 
-The runner-ci VM hosts the [Spring AI MCP server](../../mcp/) which gives Cursor IDE live access to the cluster's Kubernetes API, Prometheus metrics, Loki logs, and ArgoCD state.
+The runner-ci VM hosts the [Spring AI MCP server](https://github.com/nilslee/k8s-lab-mcp) which gives Cursor IDE live access to the cluster's Kubernetes API, Prometheus metrics, Loki logs, and ArgoCD state.
 
 ### How It Works
 
@@ -377,7 +377,7 @@ The pipeline is idempotent — it stops and removes the old container before sta
 
 ### Grafana / Loki basic auth (optional)
 
-The MCP app reads `GRAFANA_USERNAME` and `GRAFANA_PASSWORD` at container startup (see `mcp/src/main/resources/application.yaml`). The **`mcp-server`** pipeline binds the Jenkins credential **`mcp-grafana-loki`** and passes them into `docker run` as `-e` variables so they stay masked in the console compared to raw env echoes.
+The MCP app reads `GRAFANA_USERNAME` and `GRAFANA_PASSWORD` at container startup (see [`application.yaml` in k8s-lab-mcp](https://github.com/nilslee/k8s-lab-mcp/blob/main/src/main/resources/application.yaml)). The **`mcp-server`** pipeline binds the Jenkins credential **`mcp-grafana-loki`** and passes them into `docker run` as `-e` variables so they stay masked in the console compared to raw env echoes.
 
 **Single path in this lab:** export `GRAFANA_USERNAME` / `GRAFANA_PASSWORD` on the host before `vagrant up` or `vagrant provision runner-ci --provision-with jenkins` → systemd exposes them to Jenkins → JCasC defines `mcp-grafana-loki` → the pipeline injects them into the container. If both are unset, the credential is empty and the MCP server still runs; it simply omits the `Authorization` header when calling Loki (fine when ingress does not require auth).
 
@@ -425,8 +425,6 @@ Or manually add this line to `/etc/hosts`:
 ```
 
 `192.168.56.200` is the first address MetalLB assigns from its pool to the NGINX Ingress Controller's LoadBalancer Service.
-
-### Network Notes
 
 ### Network Notes
 
