@@ -5,6 +5,7 @@ pipeline {
         IMAGE_NAME      = 'mcp-server:latest'
         MCP_PORT        = '9000'
         KUBECONFIG_PATH = '/vagrant/kubeconfig'
+        GRAFANA_LOKI    = credentials('mcp-grafana-loki')
     }
     stages {
         stage('Preflight -- Kubeconfig') {
@@ -41,6 +42,8 @@ pipeline {
                       --memory-swap=512m \
                       --network=host \
                       -e SPRING_PROFILES_ACTIVE=runner \
+                      -e GRAFANA_USERNAME="${GRAFANA_LOKI_USR}" \
+                      -e GRAFANA_PASSWORD="${GRAFANA_LOKI_PSW}" \
                       -v ${KUBECONFIG_PATH}:/app/kubeconfig:ro \
                       ${IMAGE_NAME}
                 '''

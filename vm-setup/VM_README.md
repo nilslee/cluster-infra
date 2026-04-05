@@ -89,18 +89,23 @@ All Jenkins configuration lives in `cluster-infra/jenkins/` and is rsynced to `/
 
 ### Credentials
 
-Two credentials are injected at provisioning time via environment variables — never stored in Git:
+Secrets are injected at provisioning time via environment variables — never stored in Git. **Required for a working CI loop:** `JENKINS_ADMIN_PASSWORD` (admin UI) and `GITHUB_PAT` (clone/push). **Optional:** `GRAFANA_USERNAME` and `GRAFANA_PASSWORD` — used by JCasC as the `mcp-grafana-loki` credential so the MCP server can send basic auth to Loki via the Grafana ingress when your lab enables it.
 
-| Env Var | Jenkins Credential ID | Purpose |
-| ------- | --------------------- | ------- |
-| `JENKINS_ADMIN_PASSWORD` | — | Admin UI password |
-| `GITHUB_PAT` | `github-pat` | PAT for cloning app repos and pushing to `cluster-infra` |
+| Env Var | Jenkins Credential ID | Required? | Purpose |
+| ------- | --------------------- | --------- | ------- |
+| `JENKINS_ADMIN_PASSWORD` | — | Yes (defaults to `admin` if unset) | Admin UI password |
+| `GITHUB_PAT` | `github-pat` | Yes for pipelines (defaults to `changeme` if unset) | PAT for cloning app repos and pushing to `cluster-infra` |
+| `GRAFANA_USERNAME` | `mcp-grafana-loki` (username) | No | MCP → Loki HTTP basic auth user (Grafana ingress) |
+| `GRAFANA_PASSWORD` | `mcp-grafana-loki` (password) | No | MCP → Loki HTTP basic auth password |
 
-Set these before `vagrant up` (or re-provision with them set) by exporting them in your shell:
+Set these before `vagrant up` (or re-provision with them set) by exporting them on your **host** shell. The `runner-ci` **jenkins** provisioner forwards `JENKINS_ADMIN_PASSWORD`, `GITHUB_PAT`, `GRAFANA_USERNAME`, and `GRAFANA_PASSWORD` from the host into the guest so `setup-jenkins.sh` and JCasC see the same values without copying them into the VM by hand:
 
 ```bash
 export JENKINS_ADMIN_PASSWORD=mysecretpassword
 export GITHUB_PAT=ghp_xxxxxxxxxxxx
+# Optional — only if Grafana/Loki ingress requires basic auth beyond the default lab setup
+export GRAFANA_USERNAME=grafana-user
+export GRAFANA_PASSWORD=grafana-secret
 vagrant up
 ```
 
@@ -139,6 +144,8 @@ vagrant rsync runner-ci && vagrant provision runner-ci --provision-with jenkins
 ```
 
 `setup-jenkins.sh` itself lives in `vm-setup/` which is always up-to-date on the VM via the default VirtualBox shared folder (`/vagrant`), so changes to it are reflected immediately without a resync.
+
+Changes to **`jcasc.yaml`** or **`setup-jenkins.sh`** require the rsync + `vagrant provision runner-ci --provision-with jenkins` flow above so Jenkins reloads JCasC and systemd-injected env vars. If you only change a **Jenkinsfile** under `/jenkins/pipelines/` on the VM, rsync (or `vagrant up` resync) may be enough for the next build — the seed job reads those paths from disk; re-run the jenkins provisioner if you need plugins or JCasC updates in the same iteration.
 
 ## Useful Commands
 
@@ -367,6 +374,12 @@ The MCP server is **not** started at `vagrant up` time — it is treated as a de
 Subsequent updates are triggered automatically by SCM polling (every 5 minutes) when changes are made to the local `./mcp/` directory (the Jenkins pipeline copies it from `/mcp` on the VM).
 
 The pipeline is idempotent — it stops and removes the old container before starting a new one.
+
+### Grafana / Loki basic auth (optional)
+
+The MCP app reads `GRAFANA_USERNAME` and `GRAFANA_PASSWORD` at container startup (see `mcp/src/main/resources/application.yaml`). The **`mcp-server`** pipeline binds the Jenkins credential **`mcp-grafana-loki`** and passes them into `docker run` as `-e` variables so they stay masked in the console compared to raw env echoes.
+
+**Single path in this lab:** export `GRAFANA_USERNAME` / `GRAFANA_PASSWORD` on the host before `vagrant up` or `vagrant provision runner-ci --provision-with jenkins` → systemd exposes them to Jenkins → JCasC defines `mcp-grafana-loki` → the pipeline injects them into the container. If both are unset, the credential is empty and the MCP server still runs; it simply omits the `Authorization` header when calling Loki (fine when ingress does not require auth).
 
 ### Checking Container Status
 

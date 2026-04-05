@@ -87,6 +87,8 @@ cat > /etc/systemd/system/jenkins.service.d/override.conf <<EOF
 Environment="${OPTS_VAR}=-Djenkins.install.runSetupWizard=false -Dcasc.jenkins.config=/var/lib/jenkins/jcasc/jcasc.yaml"
 Environment="JENKINS_ADMIN_PASSWORD=${JENKINS_ADMIN_PASSWORD:-admin}"
 Environment="GITHUB_PAT=${GITHUB_PAT:-changeme}"
+Environment="GRAFANA_USERNAME=${GRAFANA_USERNAME:-}"
+Environment="GRAFANA_PASSWORD=${GRAFANA_PASSWORD:-}"
 EOF
 
 # ── DNS for k8s.lab hostnames (needed by the MCP server container) ────────────

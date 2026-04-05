@@ -72,7 +72,12 @@ Vagrant.configure("2") do |config|
     ci.vm.provision "shell", path: "setup-dashboard.sh"
     ci.vm.provision "shell", path: "setup-coredns-dns.sh"
     ci.vm.provision "shell", path: "setup-argocd.sh"
-    ci.vm.provision "jenkins", type: "shell", path: "setup-jenkins.sh"
+    ci.vm.provision "jenkins", type: "shell", path: "setup-jenkins.sh", env: {
+      "JENKINS_ADMIN_PASSWORD" => ENV.fetch("JENKINS_ADMIN_PASSWORD", "admin"),
+      "GITHUB_PAT" => ENV.fetch("GITHUB_PAT", "changeme"),
+      "GRAFANA_USERNAME" => ENV.fetch("GRAFANA_USERNAME", ""),
+      "GRAFANA_PASSWORD" => ENV.fetch("GRAFANA_PASSWORD", "")
+    }
   end
 
   # Disable automatic box update checking. If you disable this, then

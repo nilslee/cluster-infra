@@ -19,6 +19,12 @@ credentials:
               username: "x-access-token"
               password: "${GITHUB_PAT}"
               description: "GitHub PAT (classic token with repo scope) for cloning repos and pushing to cluster-infra"
+          - usernamePassword:
+              scope: GLOBAL
+              id: "mcp-grafana-loki"
+              username: "${GRAFANA_USERNAME}"
+              password: "${GRAFANA_PASSWORD}"
+              description: "MCP Loki client basic auth (Grafana ingress); optional for labs without auth"
 
 unclassified:
   location:
