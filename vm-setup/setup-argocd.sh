@@ -18,7 +18,7 @@ kubectl rollout status deployment/argocd-server -n argocd --timeout=120s
 
 kubectl apply -f /argocd/argocd-ingress.yaml
 kubectl apply -f /argocd/applications/namespaces.yaml
-kubectl apply -f /argocd/applications/my-redis.yaml
+kubectl apply -f /argocd/applications
 
 ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath="{.data.password}" | base64 -d)

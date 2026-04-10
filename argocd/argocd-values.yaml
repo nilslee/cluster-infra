@@ -15,6 +15,15 @@ applicationSet:
 configs:
   params:
     server.insecure: "true"
+  cm:
+    accounts.mcp-service-account: apiKey, login
+  rbac:
+    policy.csv: |
+      p, role:automation, applications, get, */*, allow
+      p, role:automation, clusters, get, *, allow
+      p, role:automation, projects, get, *, allow
+      p, role:automation, repositories, get, *, allow
+      g, mcp-service-account, role:automation
 
 server:
   resources:

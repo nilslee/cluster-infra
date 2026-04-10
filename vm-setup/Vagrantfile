@@ -66,12 +66,14 @@ Vagrant.configure("2") do |config|
       vb.memory = "4096"
       vb.cpus = 2
     end
+    # Guest DNS before any curl/git (VirtualBox DHCP DNS is often flaky for this VM).
+    ci.vm.provision "shell", path: "setup-runner-ci-guest-dns.sh"
     ci.vm.provision "shell", path: "runner-ci.sh"
     ci.vm.provision "shell", path: "setup-networking.sh"
-    ci.vm.provision "shell", path: "setup-monitoring.sh"
-    ci.vm.provision "shell", path: "setup-dashboard.sh"
+    ci.vm.provision "monitoring", type: "shell", path: "setup-monitoring.sh"
+    ci.vm.provision "dashboard", type: "shell", path: "setup-dashboard.sh"
     ci.vm.provision "shell", path: "setup-coredns-dns.sh"
-    ci.vm.provision "shell", path: "setup-argocd.sh"
+    ci.vm.provision "argocd", type: "shell", path: "setup-argocd.sh"
     ci.vm.provision "jenkins", type: "shell", path: "setup-jenkins.sh", env: {
       "JENKINS_ADMIN_PASSWORD" => ENV.fetch("JENKINS_ADMIN_PASSWORD", "admin"),
       "GITHUB_PAT" => ENV.fetch("GITHUB_PAT", "changeme"),

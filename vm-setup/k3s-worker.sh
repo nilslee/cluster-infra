@@ -1,6 +1,19 @@
 #!/bin/bash
+set -euo pipefail
+
 # Get the master node's IP from the arguments
 MASTER_IP=$1
+
+# Pin resolver upstreams persistently. VirtualBox DHCP DNS can be flaky and
+# causes intermittent registry lookup failures (ImagePullBackOff).
+mkdir -p /etc/systemd/resolved.conf.d
+cat >/etc/systemd/resolved.conf.d/99-k8s-lab.conf <<'EOF'
+[Resolve]
+DNS=8.8.8.8 1.1.1.1
+FallbackDNS=9.9.9.9 8.8.4.4
+EOF
+rm -f /etc/netplan/99-k3s-worker-lab-dns.yaml
+systemctl restart systemd-resolved
 
 # Get the token from the shared folder
 TOKEN=$(cat /vagrant/token)

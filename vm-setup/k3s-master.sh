@@ -1,5 +1,18 @@
 #!/bin/bash
+set -euo pipefail
+
 echo 'vagrant ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/vagrant
+
+# Pin resolver upstreams persistently. VirtualBox DHCP DNS can be flaky and
+# causes intermittent registry lookup failures.
+mkdir -p /etc/systemd/resolved.conf.d
+cat >/etc/systemd/resolved.conf.d/99-k8s-lab.conf <<'EOF'
+[Resolve]
+DNS=8.8.8.8 1.1.1.1
+FallbackDNS=9.9.9.9 8.8.4.4
+EOF
+rm -f /etc/netplan/99-k3s-worker-lab-dns.yaml
+systemctl restart systemd-resolved
 
 # Configure insecure mirror for the local registry before k3s starts
 mkdir -p /etc/rancher/k3s

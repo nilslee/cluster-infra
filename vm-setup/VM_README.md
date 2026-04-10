@@ -4,15 +4,13 @@ This directory contains the Vagrantfile and provisioning scripts for the lab. Fo
 
 ## VM Layout
 
-
-| VM            | Hostname    | IP            | RAM     | CPUs | Role                                                                     |
-| ------------- | ----------- | ------------- | ------- | ---- | ------------------------------------------------------------------------ |
-| `k3s-master`  | k3s-master  | 192.168.56.11 | 3072 MB | 2    | k3s control plane                                                        |
-| `k3s-worker1` | k3s-worker1 | 192.168.56.12 | 2048 MB | 1    | k3s worker node                                                          |
-| `k3s-worker2` | k3s-worker2 | 192.168.56.13 | 2048 MB | 1    | k3s worker node                                                          |
+| VM            | Hostname    | IP            | RAM     | CPUs | Role                                                                               |
+| ------------- | ----------- | ------------- | ------- | ---- | ---------------------------------------------------------------------------------- |
+| `k3s-master`  | k3s-master  | 192.168.56.11 | 3072 MB | 2    | k3s control plane                                                                  |
+| `k3s-worker1` | k3s-worker1 | 192.168.56.12 | 2048 MB | 1    | k3s worker node                                                                    |
+| `k3s-worker2` | k3s-worker2 | 192.168.56.13 | 2048 MB | 1    | k3s worker node                                                                    |
 | `runner-ci`   | runner-ci   | 192.168.56.10 | 4096 MB | 2    | Jenkins CI + container registry + monitoring/dashboard/Argo CD deploy + MCP server |
-| **Total**     |             |               |         |      |                                                                          |
-
+| **Total**     |             |               |         |      |                                                                                    |
 
 ## What Gets Provisioned
 
@@ -78,25 +76,25 @@ Open the Jenkins UI in your browser at **[http://192.168.56.10:8080](http://192.
 
 All Jenkins configuration lives in `cluster-infra/jenkins/` and is rsynced to `/jenkins/` on the VM at provisioning time:
 
-| File | Purpose |
-| ---- | ------- |
-| `jenkins/jcasc.yaml` | Single source of truth — security realm, credentials, job definitions |
-| `jenkins/plugins.txt` | Plugin manifest installed by `jenkins-plugin-cli` at provisioning time |
-| `jenkins/seed-jobs.groovy` | Job DSL script (also inlined in `jcasc.yaml`) that creates all pipeline jobs |
-| `jenkins/pipelines/my-redis.Jenkinsfile` | Build-and-promote pipeline for `my-redis` |
-| `jenkins/pipelines/redis-gui-tester.Jenkinsfile` | Build-and-promote pipeline for `redis-gui-tester` |
-| `jenkins/pipelines/mcp-server.Jenkinsfile` | Full-setup pipeline for the MCP server |
+| File                                             | Purpose                                                                      |
+| ------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `jenkins/jcasc.yaml`                             | Single source of truth — security realm, credentials, job definitions        |
+| `jenkins/plugins.txt`                            | Plugin manifest installed by `jenkins-plugin-cli` at provisioning time       |
+| `jenkins/seed-jobs.groovy`                       | Job DSL script (also inlined in `jcasc.yaml`) that creates all pipeline jobs |
+| `jenkins/pipelines/my-redis.Jenkinsfile`         | Build-and-promote pipeline for `my-redis`                                    |
+| `jenkins/pipelines/redis-gui-tester.Jenkinsfile` | Build-and-promote pipeline for `redis-gui-tester`                            |
+| `jenkins/pipelines/mcp-server.Jenkinsfile`       | Full-setup pipeline for the MCP server                                       |
 
 ### Credentials
 
 Secrets are injected at provisioning time via environment variables — never stored in Git. **Required for a working CI loop:** `JENKINS_ADMIN_PASSWORD` (admin UI) and `GITHUB_PAT` (clone/push). **Optional:** `GRAFANA_USERNAME` and `GRAFANA_PASSWORD` — used by JCasC as the `mcp-grafana-loki` credential so the MCP server can send basic auth to Loki via the Grafana ingress when your lab enables it.
 
-| Env Var | Jenkins Credential ID | Required? | Purpose |
-| ------- | --------------------- | --------- | ------- |
-| `JENKINS_ADMIN_PASSWORD` | — | Yes (defaults to `admin` if unset) | Admin UI password |
-| `GITHUB_PAT` | `github-pat` | Yes for pipelines (defaults to `changeme` if unset) | PAT for cloning app repos and pushing to `cluster-infra` |
-| `GRAFANA_USERNAME` | `mcp-grafana-loki` (username) | No | MCP → Loki HTTP basic auth user (Grafana ingress) |
-| `GRAFANA_PASSWORD` | `mcp-grafana-loki` (password) | No | MCP → Loki HTTP basic auth password |
+| Env Var                  | Jenkins Credential ID         | Required?                                           | Purpose                                                  |
+| ------------------------ | ----------------------------- | --------------------------------------------------- | -------------------------------------------------------- |
+| `JENKINS_ADMIN_PASSWORD` | —                             | Yes (defaults to `admin` if unset)                  | Admin UI password                                        |
+| `GITHUB_PAT`             | `github-pat`                  | Yes for pipelines (defaults to `changeme` if unset) | PAT for cloning app repos and pushing to `cluster-infra` |
+| `GRAFANA_USERNAME`       | `mcp-grafana-loki` (username) | No                                                  | MCP → Loki HTTP basic auth user (Grafana ingress)        |
+| `GRAFANA_PASSWORD`       | `mcp-grafana-loki` (password) | No                                                  | MCP → Loki HTTP basic auth password                      |
 
 Set these before `vagrant up` (or re-provision with them set) by exporting them on your **host** shell. The `runner-ci` **jenkins** provisioner forwards `JENKINS_ADMIN_PASSWORD`, `GITHUB_PAT`, `GRAFANA_USERNAME`, and `GRAFANA_PASSWORD` from the host into the guest so `setup-jenkins.sh` and JCasC see the same values without copying them into the VM by hand:
 
@@ -176,7 +174,6 @@ The cluster ships with a full observability stack deployed automatically during 
 
 ### Components
 
-
 | Component              | Chart                   | Description                                          |
 | ---------------------- | ----------------------- | ---------------------------------------------------- |
 | **Prometheus**         | `kube-prometheus-stack` | Metrics collection and storage (3-day retention)     |
@@ -185,7 +182,6 @@ The cluster ships with a full observability stack deployed automatically during 
 | **kube-state-metrics** | `kube-prometheus-stack` | Kubernetes object metrics                            |
 | **Loki**               | `loki`                  | Log aggregation (SingleBinary mode, 3-day retention) |
 | **Promtail**           | `promtail`              | Log shipping from all nodes (DaemonSet)              |
-
 
 All components run in the `monitoring` namespace.
 
@@ -203,7 +199,6 @@ Two sets of dashboards are pre-provisioned automatically.
 
 **Kubernetes Views** — a Grafana Cloud-style drilldown hierarchy for cluster inventory. Found under **Dashboards → Kubernetes Views**.
 
-
 | Dashboard                        | Grafana ID | What it shows                                                      |
 | -------------------------------- | ---------- | ------------------------------------------------------------------ |
 | Kubernetes / System / API Server | 15761      | API server request rates, latency, and errors                      |
@@ -213,7 +208,6 @@ Two sets of dashboards are pre-provisioned automatically.
 | Kubernetes / Views / Nodes       | 15759      | Per-node pod list, CPU/memory/disk                                 |
 | Kubernetes / Views / Pods        | 15760      | Per-pod container list, restarts, resource limits                  |
 
-
 Start at **Views / Global** and use the namespace/node/pod dropdowns at the top of each dashboard to drill down. These dashboards are loaded from grafana.com at Grafana startup (requires internet access from the VM).
 
 ### Re-deploying / Updating the Monitoring Stack
@@ -221,8 +215,7 @@ Start at **Views / Global** and use the namespace/node/pod dropdowns at the top 
 If you change the Helm values files (`cluster-infra/monitoring/*.yaml`), re-run the deploy script from the runner VM:
 
 ```bash
-vagrant ssh runner-ci
-KUBECONFIG=/vagrant/kubeconfig bash /vagrant/vm-setup/setup-monitoring.sh
+vagrant rsync runner-ci && vagrant provision runner-ci --provision-with monitoring
 ```
 
 The script is idempotent (`helm upgrade --install`), so it is safe to run multiple times.
@@ -260,8 +253,7 @@ Copy the token output and paste it into the Headlamp login screen.
 If you change the Helm values (`cluster-infra/dashboard/headlamp-values.yaml`), re-run the deploy script from the runner VM:
 
 ```bash
-vagrant ssh runner-ci
-KUBECONFIG=/vagrant/kubeconfig bash /vagrant/vm-setup/setup-dashboard.sh
+vagrant rsync runner-ci && vagrant provision runner-ci --provision-with dashboard
 ```
 
 The script is idempotent (`helm upgrade --install`), so it is safe to run multiple times.
@@ -280,10 +272,10 @@ Developer push → CI builds image → CI bumps newTag in cluster-infra → Argo
 
 Argo CD watches the `cluster-infra` GitHub repo and reconciles the cluster whenever a new commit lands on `main`. Two Applications are configured:
 
-| Application  | Path                  | Namespace | Sync policy          |
-| ------------ | --------------------- | --------- | -------------------- |
-| `namespaces` | `k8s/namespaces/`     | (various) | Auto-sync + selfHeal |
-| `my-redis`   | `k8s/apps/my-redis/`  | `k8s-lab` | Auto-sync + selfHeal |
+| Application  | Path                 | Namespace | Sync policy          |
+| ------------ | -------------------- | --------- | -------------------- |
+| `namespaces` | `k8s/namespaces/`    | (various) | Auto-sync + selfHeal |
+| `my-redis`   | `k8s/apps/my-redis/` | `k8s-lab` | Auto-sync + selfHeal |
 
 ### Accessing Argo CD
 
@@ -319,8 +311,7 @@ kubectl apply -f cluster-infra/argocd/applications/<app-name>.yaml
 If you change the Helm values (`cluster-infra/argocd/argocd-values.yaml`), re-run the deploy script from the runner VM:
 
 ```bash
-vagrant ssh runner-ci
-KUBECONFIG=/vagrant/kubeconfig bash /vagrant/vm-setup/setup-argocd.sh
+vagrant rsync runner-ci && vagrant provision runner-ci --provision-with argocd
 ```
 
 The script is idempotent (`helm upgrade --install`), so it is safe to run multiple times.
@@ -403,12 +394,10 @@ macOS Host ──▶ MetalLB VIP (192.168.56.200) ──▶ NGINX Ingress Contro
                                                     └─ app.k8s.lab       → App Services
 ```
 
-
 | Component                    | Namespace        | Purpose                                             |
 | ---------------------------- | ---------------- | --------------------------------------------------- |
 | **MetalLB**                  | `metallb-system` | Assigns VIPs from `192.168.56.200-220` via L2/ARP   |
 | **NGINX Ingress Controller** | `ingress-nginx`  | Routes HTTP traffic by hostname to backend services |
-
 
 ### DNS Setup (macOS Host)
 
@@ -434,4 +423,3 @@ Or manually add this line to `/etc/hosts`:
 - Workflows reference the registry as `192.168.56.10:5000/<image-name>`
 - MetalLB VIP pool (`192.168.56.200-220`) sits outside the static VM range (`.10-.13`) to avoid collisions
 - k3s's bundled ServiceLB and Traefik are disabled (`--disable servicelb --disable traefik`) in favour of MetalLB + NGINX
-
