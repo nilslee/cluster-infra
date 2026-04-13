@@ -17,3 +17,6 @@ token
 .vscode/
 .idea/
 *.code-workspace
+
+# Cursor
+.cursor/

@@ -27,7 +27,7 @@ echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
   /etc/apt/sources.list.d/jenkins.list > /dev/null
 
 apt-get update -q
-apt-get install -y jenkins
+apt-get install -y jenkins nginx
 
 # ── Stop Jenkins immediately ──────────────────────────────────────────────────
 # apt auto-starts Jenkins on install. Stop it before it finishes first-boot
@@ -85,6 +85,7 @@ mkdir -p /etc/systemd/system/jenkins.service.d
 cat > /etc/systemd/system/jenkins.service.d/override.conf <<EOF
 [Service]
 Environment="${OPTS_VAR}=-Djenkins.install.runSetupWizard=false -Dcasc.jenkins.config=/var/lib/jenkins/jcasc/jcasc.yaml"
+Environment="JENKINS_LISTEN_ADDRESS=127.0.0.1"
 Environment="JENKINS_ADMIN_PASSWORD=${JENKINS_ADMIN_PASSWORD:-admin}"
 Environment="GITHUB_PAT=${GITHUB_PAT:-changeme}"
 Environment="GRAFANA_USERNAME=${GRAFANA_USERNAME:-}"
@@ -99,6 +100,12 @@ if ! grep -q "prometheus.k8s.lab" /etc/hosts; then
   echo "${HOSTS_LINE}" >> /etc/hosts
   echo "==> Added k8s.lab host entries to /etc/hosts"
 fi
+# Jenkins UI is on this VM; resolve jenkins.k8s.lab to match JCasC root URL (avoids reverse-proxy warning).
+JENKINS_HOSTS_LINE="192.168.56.10 jenkins.k8s.lab"
+if ! grep -q "jenkins.k8s.lab" /etc/hosts; then
+  echo "${JENKINS_HOSTS_LINE}" >> /etc/hosts
+  echo "==> Added jenkins.k8s.lab to /etc/hosts"
+fi
 
 # ── Free port 9000 if an old MCP container is still bound to it ───────────────
 # On re-provision of an existing VM, the old mcp-server container (from the
@@ -106,13 +113,22 @@ fi
 docker stop mcp-server 2>/dev/null || true
 docker rm   mcp-server 2>/dev/null || true
 
-# ── Start Jenkins ─────────────────────────────────────────────────────────────
+# ── Nginx reverse proxy (jenkins.k8s.lab:80 → 127.0.0.1:8080) ─────────────────
+cp /jenkins/nginx-jenkins-map.conf /etc/nginx/conf.d/jenkins-upgrade-map.conf
+cp /jenkins/nginx-jenkins-site.conf /etc/nginx/sites-available/jenkins.k8s.lab
+rm -f /etc/nginx/sites-enabled/default
+ln -sf /etc/nginx/sites-available/jenkins.k8s.lab /etc/nginx/sites-enabled/jenkins.k8s.lab
+
+# ── Start Jenkins and nginx ───────────────────────────────────────────────────
 systemctl daemon-reload
 systemctl enable --now jenkins
+nginx -t
+systemctl enable nginx
+systemctl restart nginx
 
 echo ""
 echo "==> Jenkins provisioning complete."
-echo "    UI      : http://192.168.56.10:8080"
+echo "    UI      : http://jenkins.k8s.lab/ (nginx on port 80; add jenkins.k8s.lab → 192.168.56.10 in your machine’s /etc/hosts)"
 echo "    Login   : admin / \${JENKINS_ADMIN_PASSWORD:-admin}"
 echo ""
 echo "    To update credentials post-provision, edit /etc/default/jenkins"

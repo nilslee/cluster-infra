@@ -28,7 +28,8 @@ credentials:
 
 unclassified:
   location:
-    url: "http://192.168.56.10:8080/"
+    # Must match the URL users use in the browser (nginx on :80 → Jenkins on 8080).
+    url: "http://jenkins.k8s.lab/"
 
 # The pipeline jobs are created by the seed job below.
 # This avoids the circular dependency between JCasC and Job DSL.

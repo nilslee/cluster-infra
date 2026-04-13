@@ -67,7 +67,7 @@ Jenkins replaces the GitHub Actions self-hosted runner. It is fully configured a
 
 ### Accessing Jenkins
 
-Open the Jenkins UI in your browser at **[http://192.168.56.10:8080](http://192.168.56.10:8080)**.
+Open the Jenkins UI at **[http://jenkins.k8s.lab/](http://jenkins.k8s.lab/)** (nginx on port 80 → Jenkins on `127.0.0.1:8080`). On your laptop, map the name in `/etc/hosts`: `192.168.56.10 jenkins.k8s.lab` (the VM’s `setup-jenkins.sh` adds the same mapping for local resolution).
 
 **Username:** `admin`  
 **Password:** value of `JENKINS_ADMIN_PASSWORD` set in `/etc/default/jenkins` on the VM (defaults to `admin` for lab use)
@@ -79,6 +79,8 @@ All Jenkins configuration lives in `cluster-infra/jenkins/` and is rsynced to `/
 | File                                             | Purpose                                                                      |
 | ------------------------------------------------ | ---------------------------------------------------------------------------- |
 | `jenkins/jcasc.yaml`                             | Single source of truth — security realm, credentials, job definitions        |
+| `jenkins/nginx-jenkins-map.conf`                 | Nginx `map` for WebSocket `Connection` (installed to `/etc/nginx/conf.d/`)   |
+| `jenkins/nginx-jenkins-site.conf`                | Nginx `server` for `jenkins.k8s.lab` → `127.0.0.1:8080`                      |
 | `jenkins/plugins.txt`                            | Plugin manifest installed by `jenkins-plugin-cli` at provisioning time       |
 | `jenkins/seed-jobs.groovy`                       | Job DSL script (also inlined in `jcasc.yaml`) that creates all pipeline jobs |
 | `jenkins/pipelines/my-redis.Jenkinsfile`         | Build-and-promote pipeline for `my-redis`                                    |
@@ -360,7 +362,7 @@ Add to `~/.cursor/mcp.json` on your macOS host:
 
 The MCP server is **not** started at `vagrant up` time — it is treated as a deployed application managed by the `mcp-server` Jenkins pipeline. After a fresh `vagrant up`, trigger the first deploy manually:
 
-1. Open [http://192.168.56.10:8080](http://192.168.56.10:8080) → **mcp-server** job → **Build Now**
+1. Open [http://jenkins.k8s.lab/](http://jenkins.k8s.lab/) → **mcp-server** job → **Build Now**
 
 Subsequent updates are triggered automatically by SCM polling (every 5 minutes) when changes are made to the local `./mcp/` directory (the Jenkins pipeline copies it from `/mcp` on the VM).
 
