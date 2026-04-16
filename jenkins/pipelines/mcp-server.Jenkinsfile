@@ -24,6 +24,18 @@ pipeline {
                 git url: 'https://github.com/nilslee/k8s-lab-mcp.git', branch: 'main', credentialsId: 'github-pat'
             }
         }
+        stage('Test') {
+            steps {
+                // Run the tests using Maven
+                sh 'mvn -B test' 
+            }
+            post {
+                always {
+                    // Record the results even if tests fail
+                    junit 'target/surefire-reports/*.xml'
+                }
+            }
+        }
         stage('Build Image') {
             steps {
                 sh "docker build -t ${IMAGE_NAME} ."
