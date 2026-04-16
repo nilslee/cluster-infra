@@ -5,3 +5,4 @@ git:latest
 credentials-binding:latest
 docker-workflow:latest
 pipeline-rest-api:latest
+junit:latest
