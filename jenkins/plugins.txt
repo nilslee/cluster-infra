@@ -4,3 +4,4 @@ workflow-aggregator:latest
 git:latest
 credentials-binding:latest
 docker-workflow:latest
+pipeline-rest-api:latest
