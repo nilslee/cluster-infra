@@ -1,5 +1,6 @@
 configuration-as-code:latest
 job-dsl:latest
+authorize-project:latest
 workflow-aggregator:latest
 git:latest
 credentials-binding:latest

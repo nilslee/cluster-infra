@@ -26,6 +26,15 @@ credentials:
               password: "${GRAFANA_PASSWORD}"
               description: "MCP Loki client basic auth (Grafana ingress); optional for labs without auth"
 
+security:
+  queueItemAuthenticator:
+    authenticators:
+      - globalQueueItemAuthenticator:
+          strategy:
+            specificUsersAuthorizationStrategy:
+              userid: "admin"
+              noNeedReauthentication: true
+
 unclassified:
   location:
     # Must match the URL users use in the browser (nginx on :80 → Jenkins on 8080).
