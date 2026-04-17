@@ -128,7 +128,7 @@ systemctl restart nginx
 
 echo ""
 echo "==> Jenkins provisioning complete."
-echo "    UI      : http://jenkins.k8s.lab/ (nginx on port 80; add jenkins.k8s.lab → 192.168.56.10 in your machine’s /etc/hosts)"
+echo "    UI      : http://jenkins.k8s.lab/ (nginx on port 80; add jenkins.k8s.lab → 192.168.56.10 in your machine's /etc/hosts)"
 echo "    Login   : admin / \${JENKINS_ADMIN_PASSWORD:-admin}"
 echo ""
 echo "    To update credentials post-provision, edit /etc/default/jenkins"

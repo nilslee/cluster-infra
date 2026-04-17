@@ -31,6 +31,30 @@ unclassified:
     # Must match the URL users use in the browser (nginx on :80 → Jenkins on 8080).
     url: "http://jenkins.k8s.lab/"
 
-# The pipeline jobs are created by the seed job below.
-# This avoids the circular dependency between JCasC and Job DSL.
-# The actual pipeline definitions are loaded from the Jenkinsfiles in /jenkins/pipelines/
+# The seed job below is created by JCasC on every startup.
+# It polls cluster-infra for changes to seed-jobs.groovy and re-runs when detected.
+# Pipeline jobs are defined via cpsScm — they pull their Jenkinsfile from cluster-infra at runtime.
+jobs:
+  - script: >
+      freeStyleJob('seed') {
+        description('Runs seed-jobs.groovy to create/update all pipeline jobs')
+        scm {
+          git {
+            remote {
+              url('https://github.com/aaronlee232/cluster-infra.git')
+              credentials('github-pat')
+            }
+            branch('*/main')
+          }
+        }
+        triggers {
+          scm('H/5 * * * *')
+        }
+        steps {
+          jobDsl {
+            targets('jenkins/seed-jobs.groovy')
+            removedJobAction('IGNORE')
+            removedViewAction('IGNORE')
+          }
+        }
+      }
