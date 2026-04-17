@@ -53,6 +53,7 @@ jobs:
         steps {
           jobDsl {
             targets('jenkins/seed_jobs.groovy')
+            sandbox(true)
             removedJobAction('IGNORE')
             removedViewAction('IGNORE')
           }
