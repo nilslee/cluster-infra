@@ -1,5 +1,9 @@
 pipeline {
     agent any
+    triggers {
+        pollSCM('H/5 * * * *')
+        cron('H/15 * * * *')
+    }
     environment {
         CONTAINER_NAME  = 'mcp-server'
         IMAGE_NAME      = 'mcp-server:latest'

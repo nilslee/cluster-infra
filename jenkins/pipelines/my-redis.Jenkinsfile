@@ -1,5 +1,9 @@
 pipeline {
     agent any
+    triggers {
+        pollSCM('H/2 * * * *')
+        cron('H/15 * * * *')
+    }
     environment {
         REGISTRY    = '192.168.56.10:5000'
         APP         = 'my-redis'

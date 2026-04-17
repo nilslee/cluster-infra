@@ -17,10 +17,6 @@ pipelineJob('my-redis') {
             lightweight(true)
         }
     }
-    triggers {
-        pollSCM('H/2 * * * *')
-        cron('H/15 * * * *')
-    }
 }
 
 pipelineJob('redis-gui-tester') {
@@ -40,10 +36,6 @@ pipelineJob('redis-gui-tester') {
             lightweight(true)
         }
     }
-    triggers {
-        pollSCM('H/2 * * * *')
-        cron('H/15 * * * *')
-    }
 }
 
 pipelineJob('mcp-server') {
@@ -62,9 +54,5 @@ pipelineJob('mcp-server') {
             scriptPath('jenkins/pipelines/mcp-server.Jenkinsfile')
             lightweight(true)
         }
-    }
-    triggers {
-        pollSCM('H/5 * * * *')
-        cron('H/15 * * * *')
     }
 }

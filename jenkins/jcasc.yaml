@@ -9,6 +9,10 @@ jenkins:
           password: "${JENKINS_ADMIN_PASSWORD}"
   authorizationStrategy: loggedInUsersCanDoAnything
 
+security:
+  globalJobDslSecurityConfiguration:
+    useScriptSecurity: false
+
 credentials:
   system:
     domainCredentials:
@@ -26,15 +30,6 @@ credentials:
               password: "${GRAFANA_PASSWORD}"
               description: "MCP Loki client basic auth (Grafana ingress); optional for labs without auth"
 
-security:
-  queueItemAuthenticator:
-    authenticators:
-      - globalQueueItemAuthenticator:
-          strategy:
-            specificUsersAuthorizationStrategy:
-              userid: "admin"
-              noNeedReauthentication: true
-
 unclassified:
   location:
     # Must match the URL users use in the browser (nginx on :80 → Jenkins on 8080).
@@ -45,26 +40,29 @@ unclassified:
 # Pipeline jobs are defined via cpsScm — they pull their Jenkinsfile from cluster-infra at runtime.
 jobs:
   - script: >
-      freeStyleJob('seed') {
-        description('Runs seed_jobs.groovy to create/update all pipeline jobs')
-        scm {
-          git {
-            remote {
-              url('https://github.com/aaronlee232/cluster-infra.git')
-              credentials('github-pat')
+      pipelineJob('seed-jobs') {
+        description('Runs seed_jobs.groovy to create/update all other jobs')
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('https://github.com/aaronlee232/cluster-infra.git')
+                  credentials('github-pat')
+                }
+                branch('*/main')
+              }
             }
-            branch('*/main')
+            scriptPath('jenkins/seed-jobs.Jenkinsfile')
           }
         }
-        triggers {
-          scm('H/5 * * * *')
-        }
-        steps {
-          jobDsl {
-            targets('jenkins/seed_jobs.groovy')
-            sandbox(true)
-            removedJobAction('IGNORE')
-            removedViewAction('IGNORE')
+        properties {
+          pipelineTriggers {
+            triggers {
+              pollSCM {
+                scmpoll_spec('H/5 * * * *')
+              }
+            }
           }
         }
       }
