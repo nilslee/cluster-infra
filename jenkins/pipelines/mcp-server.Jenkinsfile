@@ -29,9 +29,14 @@ pipeline {
             }
         }
         stage('Test') {
+            agent {
+                docker {
+                    image 'maven:3-eclipse-temurin-25'
+                    reuseNode true
+                }
+            }
             steps {
-                // Run the tests using Maven
-                sh 'mvn -B test' 
+                sh 'mvn -B -Dmaven.repo.local="${WORKSPACE}/.m2" test'
             }
             post {
                 always {
