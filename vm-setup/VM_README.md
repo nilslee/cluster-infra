@@ -98,7 +98,7 @@ Secrets are injected at provisioning time via environment variables — never st
 | `GRAFANA_USERNAME`       | `mcp-grafana-loki` (username) | No                                                  | MCP → Loki HTTP basic auth user (Grafana ingress)        |
 | `GRAFANA_PASSWORD`       | `mcp-grafana-loki` (password) | No                                                  | MCP → Loki HTTP basic auth password                      |
 | `MCP_POSTGRES_USER`      | `mcp-postgres` (username)     | No (defaults to `mcp`)                              | Postgres user for MCP compose `db` service               |
-| `MCP_POSTGRES_PASSWORD`  | `mcp-postgres` (password)       | No (defaults to `mcp`)                              | Postgres password for MCP compose `db` service           |
+| `MCP_POSTGRES_PASSWORD`  | `mcp-postgres` (password)     | No (defaults to `mcp`)                              | Postgres password for MCP compose `db` service           |
 
 Set these before `vagrant up` (or re-provision with them set) by exporting them on your **host** shell. The `runner-ci` **jenkins** provisioner forwards `JENKINS_ADMIN_PASSWORD`, `GITHUB_PAT`, `GRAFANA_USERNAME`, `GRAFANA_PASSWORD`, `MCP_POSTGRES_USER`, and `MCP_POSTGRES_PASSWORD` from the host into the guest so `setup-jenkins.sh` and JCasC see the same values without copying them into the VM by hand:
 

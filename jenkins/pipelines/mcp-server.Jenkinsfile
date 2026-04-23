@@ -7,7 +7,9 @@ pipeline {
     environment {
         CONTAINER_NAME  = 'mcp-server'
         IMAGE_NAME      = 'mcp-server:latest'
-        MCP_PORT        = '9000'
+        MCP_PORT            = '9000'
+        PGADMIN_PORT        = '8090'
+        PGADMIN_HOST_PORT   = '8090'
         KUBECONFIG_PATH = '/vagrant/kubeconfig'
         GRAFANA_LOKI    = credentials('mcp-grafana-loki')
         POSTGRES        = credentials('mcp-postgres')
@@ -55,13 +57,10 @@ pipeline {
             steps {
                 sh '''
                     set -e
-                    # Remove any legacy standalone container (no-op on subsequent runs)
-                    docker stop ${CONTAINER_NAME} 2>/dev/null || true
-                    docker rm   ${CONTAINER_NAME} 2>/dev/null || true
 
-                    # Bring up full stack; force-recreate only mcp-server to avoid
-                    # disrupting postgres/pgadmin between deploys (db creds: compose.yaml + POSTGRES_* env from Jenkins)
-                    if ! docker compose up -d --force-recreate mcp-server; then
+                    # mcp-server depends_on db; pgadmin is not a dependency of mcp-server — list it explicitly so it runs.
+                    # Force-recreate app + GUI only; leave db volume/data intact.
+                    if ! docker compose up -d --force-recreate mcp-server pgadmin; then
                         echo "ERROR: docker compose up failed"
                         echo "=== docker compose ps -a ==="
                         docker compose ps -a 2>&1 || true
@@ -74,21 +73,43 @@ pipeline {
         }
         stage('Health Check') {
             steps {
-                // Retry for up to 60 seconds waiting for Spring Boot actuator health endpoint
+                // Wait for mcp-server (Spring actuator), Postgres (pg_isready in db container), pgAdmin (/misc/ping).
                 sh '''
-                    echo "Waiting for MCP server to become healthy..."
-                    for i in $(seq 1 12); do
-                        if curl -sf http://localhost:${MCP_PORT}/actuator/health > /dev/null 2>&1; then
-                            echo "MCP server is healthy"
+                    set -u
+                    echo "Waiting for mcp-server, postgres (db), and pgadmin to become healthy..."
+                    for i in $(seq 1 24); do
+                        mcp_ok=0
+                        pg_ok=0
+                        pga_ok=0
+
+                        if curl -sf --max-time 5 "http://127.0.0.1:${MCP_PORT}/actuator/health" > /dev/null 2>&1; then
+                            mcp_ok=1
+                        fi
+                        if docker compose exec -T db sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > /dev/null 2>&1; then
+                            pg_ok=1
+                        fi
+                        if curl -sf --max-time 5 "http://127.0.0.1:${PGADMIN_PORT}/misc/ping" > /dev/null 2>&1; then
+                            pga_ok=1
+                        fi
+
+                        if [ "$mcp_ok" = 1 ] && [ "$pg_ok" = 1 ] && [ "$pga_ok" = 1 ]; then
+                            echo "All checks passed: mcp-server actuator, postgres pg_isready, pgadmin /misc/ping"
                             exit 0
                         fi
+
+                        echo "  attempt ${i}/24: mcp_server=${mcp_ok} postgres=${pg_ok} pgadmin=${pga_ok} (sleep 5s)"
                         sleep 5
                     done
-                    echo "ERROR: MCP server did not become healthy within 60 seconds"
+
+                    echo "ERROR: stack not healthy within ~120s (see flags above: 1=ok)"
                     echo "=== docker compose ps -a ==="
                     docker compose ps -a 2>&1 || true
+                    echo "=== docker compose logs (db, tail 120) ==="
+                    docker compose logs --no-color --tail=120 db 2>&1 || true
                     echo "=== docker compose logs (mcp-server, tail 200) ==="
                     docker compose logs --no-color --tail=200 mcp-server 2>&1 || true
+                    echo "=== docker compose logs (pgadmin, tail 120) ==="
+                    docker compose logs --no-color --tail=120 pgadmin 2>&1 || true
                     echo "=== docker logs ${CONTAINER_NAME} (fallback) ==="
                     docker logs "${CONTAINER_NAME}" --tail 200 2>&1 || true
                     exit 1
@@ -101,7 +122,7 @@ pipeline {
             echo "MCP server deployed successfully."
             echo "  Health check : http://192.168.56.10:${MCP_PORT}/actuator/health"
             echo "  MCP endpoint : http://192.168.56.10:${MCP_PORT}/mcp"
-            echo "  pgAdmin      : http://192.168.56.10:8080"
+            echo "  pgAdmin      : http://192.168.56.10:${PGADMIN_PORT}"
         }
         failure {
             // post {} runs outside the main agent workspace — sh needs node { } for FilePath context
