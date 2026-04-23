@@ -10,6 +10,7 @@ pipeline {
         MCP_PORT        = '9000'
         KUBECONFIG_PATH = '/vagrant/kubeconfig'
         GRAFANA_LOKI    = credentials('mcp-grafana-loki')
+        POSTGRES        = credentials('mcp-postgres')
     }
     stages {
         stage('Preflight -- Kubeconfig') {
@@ -50,23 +51,16 @@ pipeline {
                 sh "docker build -t ${IMAGE_NAME} ."
             }
         }
-        stage('Deploy Container') {
+        stage('Deploy Stack') {
             steps {
                 sh '''
+                    # Remove any legacy standalone container (no-op on subsequent runs)
                     docker stop ${CONTAINER_NAME} 2>/dev/null || true
                     docker rm   ${CONTAINER_NAME} 2>/dev/null || true
 
-                    docker run -d \
-                      --name ${CONTAINER_NAME} \
-                      --restart=unless-stopped \
-                      --memory=512m \
-                      --memory-swap=512m \
-                      --network=host \
-                      -e SPRING_PROFILES_ACTIVE=runner \
-                      -e GRAFANA_USERNAME="${GRAFANA_LOKI_USR}" \
-                      -e GRAFANA_PASSWORD="${GRAFANA_LOKI_PSW}" \
-                      -v ${KUBECONFIG_PATH}:/app/kubeconfig:ro \
-                      ${IMAGE_NAME}
+                    # Bring up full stack; force-recreate only mcp-server to avoid
+                    # disrupting postgres/pgadmin between deploys (db creds: compose.yaml + POSTGRES_* env from Jenkins)
+                    docker compose up -d --force-recreate mcp-server
                 '''
             }
         }
@@ -94,6 +88,7 @@ pipeline {
             echo "MCP server deployed successfully."
             echo "  Health check : http://192.168.56.10:${MCP_PORT}/actuator/health"
             echo "  MCP endpoint : http://192.168.56.10:${MCP_PORT}/mcp"
+            echo "  pgAdmin      : http://192.168.56.10:8080"
         }
         failure {
             echo "MCP server deployment failed. Check docker logs mcp-server for details."

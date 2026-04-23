@@ -90,6 +90,8 @@ Environment="JENKINS_ADMIN_PASSWORD=${JENKINS_ADMIN_PASSWORD:-admin}"
 Environment="GITHUB_PAT=${GITHUB_PAT:-changeme}"
 Environment="GRAFANA_USERNAME=${GRAFANA_USERNAME:-}"
 Environment="GRAFANA_PASSWORD=${GRAFANA_PASSWORD:-}"
+Environment="MCP_POSTGRES_USER=${MCP_POSTGRES_USER:-mcp}"
+Environment="MCP_POSTGRES_PASSWORD=${MCP_POSTGRES_PASSWORD:-mcp}"
 EOF
 
 # ── DNS for k8s.lab hostnames (needed by the MCP server container) ────────────

@@ -29,6 +29,12 @@ credentials:
               username: "${GRAFANA_USERNAME}"
               password: "${GRAFANA_PASSWORD}"
               description: "MCP Loki client basic auth (Grafana ingress); optional for labs without auth"
+          - usernamePassword:
+              scope: GLOBAL
+              id: "mcp-postgres"
+              username: "${MCP_POSTGRES_USER}"
+              password: "${MCP_POSTGRES_PASSWORD}"
+              description: "Postgres credentials for the MCP diagnostics DB"
 
 unclassified:
   location:

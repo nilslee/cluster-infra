@@ -78,7 +78,9 @@ Vagrant.configure("2") do |config|
       "JENKINS_ADMIN_PASSWORD" => ENV.fetch("JENKINS_ADMIN_PASSWORD", "admin"),
       "GITHUB_PAT" => ENV.fetch("GITHUB_PAT", "changeme"),
       "GRAFANA_USERNAME" => ENV.fetch("GRAFANA_USERNAME", ""),
-      "GRAFANA_PASSWORD" => ENV.fetch("GRAFANA_PASSWORD", "")
+      "GRAFANA_PASSWORD" => ENV.fetch("GRAFANA_PASSWORD", ""),
+      "MCP_POSTGRES_USER" => ENV.fetch("MCP_POSTGRES_USER", "mcp"),
+      "MCP_POSTGRES_PASSWORD" => ENV.fetch("MCP_POSTGRES_PASSWORD", "mcp")
     }
   end
 
